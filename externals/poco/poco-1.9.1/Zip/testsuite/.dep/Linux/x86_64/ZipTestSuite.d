@@ -1,0 +1,24 @@
+/home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/Zip/testsuite/obj/Linux/x86_64/debug_static/ZipTestSuite.o /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/Zip/testsuite/obj/Linux/x86_64/release_static/ZipTestSuite.o /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/Zip/testsuite/obj/Linux/x86_64/debug_shared/ZipTestSuite.o /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/Zip/testsuite/obj/Linux/x86_64/release_shared/ZipTestSuite.o: src/ZipTestSuite.cpp src/ZipTestSuite.h \
+ /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/CppUnit/include/CppUnit/TestSuite.h \
+ /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/CppUnit/include/CppUnit/CppUnit.h \
+ /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/CppUnit/include/CppUnit/Guards.h \
+ /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/CppUnit/include/CppUnit/Test.h \
+ src/ZipTest.h \
+ /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/Zip/include/Poco/Zip/Zip.h \
+ /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/Foundation/include/Poco/Foundation.h \
+ /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/Foundation/include/Poco/Config.h \
+ /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/Foundation/include/Poco/Platform.h \
+ /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/Foundation/include/Poco/Platform_POSIX.h \
+ /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/Foundation/include/Poco/Alignment.h \
+ /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/Foundation/include/Poco/Bugcheck.h \
+ /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/Foundation/include/Poco/Types.h \
+ /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/Zip/include/Poco/Zip/ZipLocalFileHeader.h \
+ /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/Zip/include/Poco/Zip/ZipUtil.h \
+ /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/Zip/include/Poco/Zip/ZipCommon.h \
+ /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/Foundation/include/Poco/DateTime.h \
+ /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/Foundation/include/Poco/Timestamp.h \
+ /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/Foundation/include/Poco/Timespan.h \
+ /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/Foundation/include/Poco/Path.h \
+ /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/CppUnit/include/CppUnit/TestCase.h \
+ /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/CppUnit/include/CppUnit/CppUnitException.h \
+ src/PartialStreamTest.h src/CompressTest.h

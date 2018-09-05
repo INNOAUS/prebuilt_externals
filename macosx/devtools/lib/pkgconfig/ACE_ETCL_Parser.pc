@@ -1,0 +1,11 @@
+prefix=/Users/leo/git-innoaus/rainpass-services/rainpass-proj/externals/ace/ACE_wrappers/../../../prebuilt_externals/macosx/devtools
+exec_prefix=/Users/leo/git-innoaus/rainpass-services/rainpass-proj/externals/ace/ACE_wrappers/../../../prebuilt_externals/macosx/devtools
+libdir=/Users/leo/git-innoaus/rainpass-services/rainpass-proj/externals/ace/ACE_wrappers/../../../prebuilt_externals/macosx/devtools/lib
+includedir=/Users/leo/git-innoaus/rainpass-services/rainpass-proj/externals/ace/ACE_wrappers/../../../prebuilt_externals/macosx/devtools/include
+
+Name: ACE_ETCL_Parser
+Description: ACE Extended Trading Constraint Language Parser Library
+Requires: ACE_ETCL
+Version: 6.5.0
+Libs: -L${libdir} -lACE_ETCL_Parser
+Cflags: -I${includedir}

@@ -1,0 +1,3 @@
+/home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/PDF/obj/Linux/x86_64/debug_static/adler32.o /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/PDF/obj/Linux/x86_64/release_static/adler32.o /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/PDF/obj/Linux/x86_64/debug_shared/adler32.o /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/PDF/obj/Linux/x86_64/release_shared/adler32.o: src/adler32.c \
+ /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/PDF/include/Poco/PDF/zlib.h \
+ /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/PDF/include/Poco/PDF/zconf.h

@@ -1,0 +1,36 @@
+/home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/Foundation/testsuite/obj/Linux/x86_64/debug_static/StringTest.o /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/Foundation/testsuite/obj/Linux/x86_64/release_static/StringTest.o /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/Foundation/testsuite/obj/Linux/x86_64/debug_shared/StringTest.o /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/Foundation/testsuite/obj/Linux/x86_64/release_shared/StringTest.o: src/StringTest.cpp src/StringTest.h \
+ /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/Foundation/include/Poco/Foundation.h \
+ /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/Foundation/include/Poco/Config.h \
+ /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/Foundation/include/Poco/Platform.h \
+ /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/Foundation/include/Poco/Platform_POSIX.h \
+ /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/Foundation/include/Poco/Alignment.h \
+ /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/Foundation/include/Poco/Bugcheck.h \
+ /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/Foundation/include/Poco/Types.h \
+ /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/CppUnit/include/Poco/CppUnit/TestCase.h \
+ /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/CppUnit/include/CppUnit/TestCase.h \
+ /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/CppUnit/include/CppUnit/CppUnit.h \
+ /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/CppUnit/include/CppUnit/Guards.h \
+ /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/CppUnit/include/CppUnit/Test.h \
+ /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/CppUnit/include/CppUnit/CppUnitException.h \
+ /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/Foundation/include/Poco/NumericString.h \
+ /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/Foundation/include/Poco/Buffer.h \
+ /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/Foundation/include/Poco/Exception.h \
+ /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/Foundation/include/Poco/FPEnvironment.h \
+ /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/Foundation/include/Poco/FPEnvironment_C99.h \
+ /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/Foundation/include/Poco/MemoryStream.h \
+ /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/Foundation/include/Poco/StreamUtil.h \
+ /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/Foundation/include/Poco/NumberFormatter.h \
+ /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/CppUnit/include/Poco/CppUnit/TestCaller.h \
+ /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/CppUnit/include/CppUnit/TestCaller.h \
+ /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/CppUnit/include/CppUnit/Guards.h \
+ /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/CppUnit/include/CppUnit/TestCase.h \
+ /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/CppUnit/include/Poco/CppUnit/TestSuite.h \
+ /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/CppUnit/include/CppUnit/TestSuite.h \
+ /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/Foundation/include/Poco/String.h \
+ /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/Foundation/include/Poco/Ascii.h \
+ /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/Foundation/include/Poco/JSONString.h \
+ /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/Foundation/include/Poco/Format.h \
+ /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/Foundation/include/Poco/Any.h \
+ /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/Foundation/include/Poco/MetaProgramming.h \
+ /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/Foundation/include/Poco/Stopwatch.h \
+ /home/leo/rainpass-services/rainpass-kt/externals/poco/poco-1.9.1/Foundation/include/Poco/Clock.h

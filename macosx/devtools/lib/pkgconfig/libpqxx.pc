@@ -1,0 +1,10 @@
+prefix=/Users/leo/git-innoaus/rainpass-services/rainpass-kt/externals/libpqxx/libpqxx-6.2.4/../../../devtools
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: libpqxx
+Description: a C++ API to the PostgreSQL database management system.
+Version: 6.2.4
+Libs: -L${libdir} -L/usr/local/lib -lpqxx
+Cflags: -I${includedir} -I/usr/local/Cellar/postgresql/10.4/include

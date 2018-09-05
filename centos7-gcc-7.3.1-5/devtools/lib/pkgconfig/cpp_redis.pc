@@ -1,0 +1,9 @@
+prefix=/home/leo/git-innoaus/rainpass-services/rainpass-proj/externals/devtools
+libdir=${prefix}/lib
+includedir=${prefix}/include
+
+Name: cpp_redis
+Description: C++11 Lightweight Redis client: async, thread-safe, no dependency, pipelining, multi-platform.
+Version: 
+Libs: -L${libdir} -lcpp_redis
+Cflags: -I${includedir}
