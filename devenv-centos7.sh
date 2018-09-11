@@ -45,4 +45,5 @@ export PATH=$PATH:/opt/rh/rh-php71/root/usr/bin
 sudo yum -y install ice-all-runtime ice-all-devel
 sudo yum -y install libfreeze-c++-devel freeze-utils
 
+sudo yum -y install bison bison-devel flex flex-devel readline-devel readline
 
