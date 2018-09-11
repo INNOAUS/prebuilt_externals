@@ -35,12 +35,13 @@ sudo yum install -y redhat-lsb-core
 sudo rpm -Uvh https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
 sudo rpm -Uvh https://mirror.webtatic.com/yum/el7/webtatic-release.rpm
 
-# install zeroc-ice
-sudo yum -y install ice-all-runtime ice-all-devel
-sudo yum -y libfreeze-c++-devel freeze-utils
-
 sudo yum install -y php71w php71w-opcache rh-php71-php-devel rh-php71
 sudo yum install -y yum-plugin-replace
 echo "export PATH=$PATH:/opt/rh/rh-php71/root/usr/bin" | tee -a $HOME/.bash_profile
 export PATH=$PATH:/opt/rh/rh-php71/root/usr/bin 
+
+# install zeroc-ice
+sudo yum -y install ice-all-runtime ice-all-devel
+sudo yum -y install libfreeze-c++-devel freeze-utils
+
 
