@@ -28,7 +28,8 @@ sudo python get-pip.py
 sudo pip install conan
 
 # install dev libs
-sudo yum install -y git libtool libtalloc-devel hiredis-devel openssl-devel libpqxx-devel
+sudo yum install -y git libtool libtalloc-devel hiredis-devel openssl-devel readline-devel readline bison-devel bison flex-devel
+#libpqxx-devel
 sudo yum install -y redhat-lsb-core
 
 # install php71

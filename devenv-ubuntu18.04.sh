@@ -19,8 +19,8 @@ sudo apt-get update
 sudo apt-get install zeroc-ice-all-runtime zeroc-ice-all-dev
 sudo apt-get install libzeroc-freeze-dev zeroc-freeze-utils
 
-sudo apt-get install bison bisonc++ libbison-dev libfl-dev flexc++ flex 
+sudo apt-get install bison bisonc++ libbison-dev libfl-dev flexc++ flex libreadline-dev
 
-sudo apt-get install libssl-dev
+sudo apt-get install libssl-dev zlibc zlib1g-dev
 
 
