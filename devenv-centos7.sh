@@ -13,6 +13,8 @@ sudo yum install -y devtoolset-7
 echo ". /opt/rh/devtoolset-7/enable" | tee -a $HOME/.bash_profile
 . /opt/rh/devtoolset-7/enable
 
+sudo yum -y install libcurl-devel curl
+
 wget https://cmake.org/files/v3.11/cmake-3.11.4.tar.gz
 tar xvfz cmake-3.11.4.tar.gz
 cd cmake-3.11.4
@@ -32,6 +34,10 @@ sudo yum install -y redhat-lsb-core
 # install php71
 sudo rpm -Uvh https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
 sudo rpm -Uvh https://mirror.webtatic.com/yum/el7/webtatic-release.rpm
+
+# install zeroc-ice
+sudo yum -y install ice-all-runtime ice-all-devel
+sudo yum -y libfreeze-c++-devel freeze-utils
 
 sudo yum install -y php71w php71w-opcache rh-php71-php-devel rh-php71
 sudo yum install -y yum-plugin-replace
