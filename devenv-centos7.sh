@@ -42,6 +42,9 @@ echo "export PATH=$PATH:/opt/rh/rh-php71/root/usr/bin" | tee -a $HOME/.bash_prof
 export PATH=$PATH:/opt/rh/rh-php71/root/usr/bin 
 
 # install zeroc-ice
+wget https://zeroc.com/download/Ice/3.7/el7/zeroc-ice3.7.repo
+sudo cp zeroc-ice3.7.repo /etc/yum.repos.d
+sudo yum update
 sudo yum -y install ice-all-runtime ice-all-devel
 sudo yum -y install libfreeze-c++-devel freeze-utils
 
