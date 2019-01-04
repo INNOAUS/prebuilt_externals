@@ -1,0 +1,11 @@
+prefix=/Users/leo/git-innoaus/prebuilt_externals/macosx/devtools
+exec_prefix=/Users/leo/git-innoaus/prebuilt_externals/macosx/devtools/bin
+libdir=/Users/leo/git-innoaus/prebuilt_externals/macosx/devtools/lib
+includedir=/Users/leo/git-innoaus/prebuilt_externals/macosx/devtools/include
+
+Name: libqrencode
+Description: A QR Code encoding library
+Version: 4.0.0
+Libs: -L${libdir} -lqrencode
+Libs.private: 
+Cflags: -I${includedir}
