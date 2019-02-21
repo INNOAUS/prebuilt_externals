@@ -1,0 +1,11 @@
+prefix=/home/leo/git-innoaus/prebuilt_externals/centos7-gcc-7.3.1-5/devtools
+exec_prefix=/home/leo/git-innoaus/prebuilt_externals/centos7-gcc-7.3.1-5/devtools
+libdir=/home/leo/git-innoaus/prebuilt_externals/centos7-gcc-7.3.1-5/devtools/lib64
+includedir=/home/leo/git-innoaus/prebuilt_externals/centos7-gcc-7.3.1-5/devtools/include
+
+Name: fmt
+Description: A modern formatting library
+Version: 5.3.1
+Libs: -L${libdir} -lfmt
+Cflags: -I${includedir}
+
