@@ -1,0 +1,11 @@
+prefix=/Users/leo/git-innoaus/prebuilt_externals/macosx/devtools
+exec_prefix=/Users/leo/git-innoaus/prebuilt_externals/macosx/devtools
+libdir=/Users/leo/git-innoaus/prebuilt_externals/macosx/devtools/lib
+includedir=/Users/leo/git-innoaus/prebuilt_externals/macosx/devtools/include
+
+Name: fmt
+Description: A modern formatting library
+Version: 5.3.1
+Libs: -L${libdir} -lfmt
+Cflags: -I${includedir}
+
