@@ -24,6 +24,7 @@
 [Usage](#usage)<br>
 [Specify the section to run](#specify-the-section-to-run)<br>
 [Filenames as tags](#filenames-as-tags)<br>
+[Override output colouring](#override-output-colouring)<br>
 
 Catch works quite nicely without any command line options at all - but for those times when you want greater control the following options are available.
 Click one of the followings links to take you straight to that option - or scroll on to browse the available options.
@@ -57,6 +58,7 @@ Click one of the followings links to take you straight to that option - or scrol
 <a href="#libidentify">                                 `    --libidentify`</a><br />
 <a href="#wait-for-keypress">                           `    --wait-for-keypress`</a><br />
 <a href="#benchmark-resolution-multiple">               `    --benchmark-resolution-multiple`</a><br />
+<a href="#use-colour">                                  `    --use-colour`</a><br />
 
 </br>
 
@@ -122,7 +124,9 @@ The JUnit reporter is an xml format that follows the structure of the JUnit XML 
 ## Breaking into the debugger
 <pre>-b, --break</pre>
 
-In some IDEs (currently XCode and Visual Studio) it is possible for Catch to break into the debugger on a test failure. This can be very helpful during debug sessions - especially when there is more than one path through a particular test.
+Under most debuggers Catch2 is capable of automatically breaking on a test
+failure. This allows the user to see the current state of the test during
+failure.
 
 <a id="showing-results-for-successful-tests"></a>
 ## Showing results for successful tests
@@ -329,6 +333,16 @@ filename it is found in, with any extension stripped, prefixed with the `#` char
 
 So, for example,  tests within the file `~\Dev\MyProject\Ferrets.cpp` would be tagged `[#Ferrets]`.
 
+<a id="use-colour"></a>
+## Override output colouring
+<pre>--use-colour &lt;yes|no|auto&gt;</pre>
+
+Catch colours output for terminals, but omits colouring when it detects that
+output is being sent to a pipe. This is done to avoid interfering with automated
+processing of output.
+
+`--use-colour yes` forces coloured output, `--use-colour no` disables coloured
+output. The default behaviour is `--use-colour auto`.
 
 ---
 
