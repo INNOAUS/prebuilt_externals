@@ -6,6 +6,6 @@ includedir=/home/leo/git-innoaus/prebuilt_externals/centos7-gcc-7.3.1-5/devtools
 Name: ACEXML_Parser
 Description: ACE XML Parser Library
 Requires: ACEXML
-Version: 6.5.2
+Version: 6.5.0
 Libs: -L${libdir} -lACEXML_Parser
 Cflags: -I${includedir}

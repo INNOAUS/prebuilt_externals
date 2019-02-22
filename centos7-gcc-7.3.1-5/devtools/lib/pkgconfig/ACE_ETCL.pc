@@ -6,6 +6,6 @@ includedir=/home/leo/git-innoaus/prebuilt_externals/centos7-gcc-7.3.1-5/devtools
 Name: ACE_ETCL
 Description: ACE Extended Trading Constraint Language Library
 Requires: ACE
-Version: 6.5.2
+Version: 6.5.0
 Libs: -L${libdir} -lACE_ETCL
 Cflags: -I${includedir}
