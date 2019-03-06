@@ -1,11 +1,6 @@
-// **********************************************************************
 //
-// Copyright (c) 2003-2018 ZeroC, Inc. All rights reserved.
+// Copyright (c) ZeroC, Inc. All rights reserved.
 //
-// This copy of Ice is licensed to you under the terms described in the
-// ICE_LICENSE file included in this distribution.
-//
-// **********************************************************************
 
 #ifndef ICE_UTIL_CONFIG_H
 #define ICE_UTIL_CONFIG_H
@@ -227,6 +222,12 @@
 #   define ICE_DEPRECATED_API(msg) /**/
 #endif
 
+#if defined(__clang__) || defined(__GNUC__)
+#   define ICE_MAYBE_UNUSED __attribute__((unused))
+#else
+#   define ICE_MAYBE_UNUSED /**/
+#endif
+
 #ifdef _WIN32
 #   include <windows.h>
 
@@ -272,8 +273,8 @@
 //
 // The Ice version.
 //
-#define ICE_STRING_VERSION "3.7.1" // "A.B.C", with A=major, B=minor, C=patch
-#define ICE_INT_VERSION 30701      // AABBCC, with AA=major, BB=minor, CC=patch
+#define ICE_STRING_VERSION "3.7.2" // "A.B.C", with A=major, B=minor, C=patch
+#define ICE_INT_VERSION 30702      // AABBCC, with AA=major, BB=minor, CC=patch
 #define ICE_SO_VERSION "37"      // "ABC", with A=major, B=minor, C=patch
 
 #if !defined(ICE_BUILDING_ICE) && defined(ICE_API_EXPORTS)
