@@ -1,6 +1,6 @@
 #! /bin/sh
 
-prefix=/home/leo/git-innoaus/rainpass-services/rainpass-proj/externals/libpqxx/libpqxx-6.2.4/../../devtools
+prefix=/home/rainpass/git-innoaus/prebuilt_externals/centos7-gcc-7.3.1-5/devtools
 exec_prefix=${prefix}
 includedir=${prefix}/include
 libdir=${exec_prefix}/lib
