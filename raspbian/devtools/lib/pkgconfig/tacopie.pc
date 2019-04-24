@@ -1,0 +1,9 @@
+prefix=/git-root/prebuilt_externals/raspbian/devtools
+libdir=${prefix}/lib
+includedir=${prefix}/include
+
+Name: tacopie
+Description: tacopie is a multi-platform TCP Client & Server C++11 library.
+Version: 
+Libs: -L${libdir} -ltacopie
+Cflags: -I${includedir}
