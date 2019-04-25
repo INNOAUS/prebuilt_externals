@@ -25,11 +25,11 @@ PGRESTORE=
 while (($i < ${#argv[*]})); do
 	case "${argv[$i]}" in
 	-V)
-		echo "bdr_initial_load (PostgreSQL 9.4.13, BDR 1.0.7)"
+		echo "bdr_initial_load (PostgreSQL 9.4.13, BDR 1.0.8)"
 		exit
 	;;
 	--version)
-		echo "bdr_initial_load (PostgreSQL 9.4.13, BDR 1.0.7)"
+		echo "bdr_initial_load (PostgreSQL 9.4.13, BDR 1.0.8)"
 		exit
 	;;
 	--snapshot)

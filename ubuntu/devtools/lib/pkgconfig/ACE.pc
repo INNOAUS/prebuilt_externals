@@ -1,0 +1,10 @@
+prefix=/home/leo/git-innoaus/prebuilt_externals/ubuntu/devtools
+exec_prefix=/home/leo/git-innoaus/prebuilt_externals/ubuntu/devtools
+libdir=/home/leo/git-innoaus/prebuilt_externals/ubuntu/devtools/lib
+includedir=/home/leo/git-innoaus/prebuilt_externals/ubuntu/devtools/include
+
+Name: ACE
+Description: ADAPTIVE Communication Environment 
+Version: 6.5.3
+Libs: -L${libdir} -lACE -ldl -lrt
+Cflags: -I${includedir}

@@ -262,7 +262,7 @@ LDAP_LIBS_FE =
 LDAP_LIBS_BE = 
 UUID_LIBS = 
 UUID_EXTRA_OBJS = 
-LD = /opt/rh/devtoolset-7/root/usr/libexec/gcc/x86_64-redhat-linux/7/ld
+LD = /usr/bin/ld
 with_gnu_ld = yes
 ld_R_works = 
 
@@ -309,7 +309,7 @@ MSGFMT  =
 MSGFMT_FLAGS = 
 MSGMERGE = 
 PYTHON	= 
-TAR	= /usr/bin/tar
+TAR	= /bin/tar
 XGETTEXT = 
 
 GZIP	= gzip
@@ -369,7 +369,7 @@ INSTALL_SHLIB	= $(INSTALL_SHLIB_ENV) $(INSTALL) $(INSTALL_SHLIB_OPTS) $(INSTALL_
 # Override in Makefile.port if necessary
 INSTALL_SHLIB_OPTS = -m 755
 
-MKDIR_P = /usr/bin/mkdir -p
+MKDIR_P = /bin/mkdir -p
 
 missing		= $(SHELL) $(top_srcdir)/config/missing
 
@@ -385,7 +385,7 @@ DOCBOOKSTYLE	=
 JADE			= 
 NSGMLS			= 
 OSX				= 
-XSLTPROC		= xsltproc
+XSLTPROC		= 
 
 # Code coverage
 
