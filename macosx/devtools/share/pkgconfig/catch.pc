@@ -1,6 +1,0 @@
-includedir=/Users/leo/git-innoaus/rainpass-services/rainpass-proj/devtools/include
-
-Name: Catch
-Description: Testing library for C++
-Version: 2.2.1
-Cflags: -I${includedir}
