@@ -1,0 +1,11 @@
+prefix=/Users/leo/git-innoaus/prebuilt_externals/macos/devtools
+exec_prefix=/Users/leo/git-innoaus/prebuilt_externals/macos/devtools
+libdir=/Users/leo/git-innoaus/prebuilt_externals/macos/devtools/lib
+includedir=/Users/leo/git-innoaus/prebuilt_externals/macos/devtools/include
+
+Name: ACE_ETCL
+Description: ACE Extended Trading Constraint Language Library
+Requires: ACE
+Version: 6.5.3
+Libs: -L${libdir} -lACE_ETCL
+Cflags: -I${includedir}
