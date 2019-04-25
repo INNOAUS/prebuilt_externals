@@ -1,7 +1,7 @@
-prefix=/home/rainpass/git-innoaus/prebuilt_externals/linux/devtools
-exec_prefix=/home/rainpass/git-innoaus/prebuilt_externals/linux/devtools
-libdir=/home/rainpass/git-innoaus/prebuilt_externals/linux/devtools/lib
-includedir=/home/rainpass/git-innoaus/prebuilt_externals/linux/devtools/include
+prefix=/home/leo/git-innoaus/prebuilt_externals/linux/devtools
+exec_prefix=/home/leo/git-innoaus/prebuilt_externals/linux/devtools
+libdir=/home/leo/git-innoaus/prebuilt_externals/linux/devtools/lib
+includedir=/home/leo/git-innoaus/prebuilt_externals/linux/devtools/include
 
 Name: ACE_ETCL
 Description: ACE Extended Trading Constraint Language Library
