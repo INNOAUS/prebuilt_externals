@@ -1,0 +1,11 @@
+prefix=/home/leo/git-innoaus/prebuilt_externals/centos/devtools
+exec_prefix=/home/leo/git-innoaus/prebuilt_externals/centos/devtools
+libdir=/home/leo/git-innoaus/prebuilt_externals/centos/devtools/lib
+includedir=/home/leo/git-innoaus/prebuilt_externals/centos/devtools/include
+
+Name: ACE_ETCL_Parser
+Description: ACE Extended Trading Constraint Language Parser Library
+Requires: ACE_ETCL
+Version: 6.5.0
+Libs: -L${libdir} -lACE_ETCL_Parser
+Cflags: -I${includedir}
