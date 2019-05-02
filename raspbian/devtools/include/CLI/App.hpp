@@ -437,17 +437,33 @@ class App {
     Option *add_option(std::string option_name,
                        callback_t option_callback,
                        std::string option_description = "",
-                       bool defaulted = false) {
-        Option myopt{option_name, option_description, option_callback, defaulted, this};
+                       bool defaulted = false,
+                       std::function<std::string()> func = {}) {
+        Option myopt{option_name, option_description, option_callback, this};
 
         if(std::find_if(std::begin(options_), std::end(options_), [&myopt](const Option_p &v) {
                return *v == myopt;
            }) == std::end(options_)) {
             options_.emplace_back();
             Option_p &option = options_.back();
-            option.reset(new Option(option_name, option_description, option_callback, defaulted, this));
+            option.reset(new Option(option_name, option_description, option_callback, this));
+
+            // Set the default string capture function
+            option->default_function(func);
+
+            // For compatibility with CLI11 1.7 and before, capture the default string here
+            if(defaulted)
+                option->capture_default_str();
+
+            // Transfer defaults to the new option
             option_defaults_.copy_to(option.get());
+
+            // Don't bother to capture if we already did
+            if(!defaulted && option->get_always_capture_default())
+                option->capture_default_str();
+
             return option.get();
+
         } else
             throw OptionAlreadyAdded(myopt.get_name());
     }
@@ -456,12 +472,16 @@ class App {
     template <typename T, enable_if_t<!is_vector<T>::value & !std::is_const<T>::value, detail::enabler> = detail::dummy>
     Option *add_option(std::string option_name,
                        T &variable, ///< The variable to set
-                       std::string option_description = "") {
+                       std::string option_description = "",
+                       bool defaulted = false) {
 
-        CLI::callback_t fun = [&variable](CLI::results_t res) { return detail::lexical_cast(res[0], variable); };
+        auto fun = [&variable](CLI::results_t res) { return detail::lexical_cast(res[0], variable); };
 
-        Option *opt = add_option(option_name, fun, option_description, false);
+        Option *opt = add_option(option_name, fun, option_description, defaulted, [&variable]() {
+            return std::string(CLI::detail::to_string(variable));
+        });
         opt->type_name(detail::type_name<T>());
+
         return opt;
     }
 
@@ -471,7 +491,7 @@ class App {
                                 const std::function<void(const T &)> &func, ///< the callback to execute
                                 std::string option_description = "") {
 
-        CLI::callback_t fun = [func](CLI::results_t res) {
+        auto fun = [func](CLI::results_t res) {
             T variable;
             bool result = detail::lexical_cast(res[0], variable);
             if(result) {
@@ -484,6 +504,7 @@ class App {
         opt->type_name(detail::type_name<T>());
         return opt;
     }
+
     /// Add option with no description or variable assignment
     Option *add_option(std::string option_name) {
         return add_option(option_name, CLI::callback_t(), std::string{}, false);
@@ -497,34 +518,14 @@ class App {
         return add_option(option_name, CLI::callback_t(), option_description, false);
     }
 
-    /// Add option for non-vectors with a default print, allow template to specify conversion type
-    template <typename T,
-              typename XC = T,
-              enable_if_t<!is_vector<XC>::value && !std::is_const<XC>::value, detail::enabler> = detail::dummy>
-    Option *add_option(std::string option_name,
-                       T &variable, ///< The variable to set
-                       std::string option_description,
-                       bool defaulted) {
-        static_assert(std::is_constructible<T, XC>::value, "assign type must be assignable from conversion type");
-        CLI::callback_t fun = [&variable](CLI::results_t res) { return detail::lexical_cast<XC>(res[0], variable); };
-
-        Option *opt = add_option(option_name, fun, option_description, defaulted);
-        opt->type_name(detail::type_name<XC>());
-        if(defaulted) {
-            std::stringstream out;
-            out << variable;
-            opt->default_str(out.str());
-        }
-        return opt;
-    }
-
     /// Add option for vectors
     template <typename T>
     Option *add_option(std::string option_name,
                        std::vector<T> &variable, ///< The variable vector to set
-                       std::string option_description = "") {
+                       std::string option_description = "",
+                       bool defaulted = false) {
 
-        CLI::callback_t fun = [&variable](CLI::results_t res) {
+        auto fun = [&variable](CLI::results_t res) {
             bool retval = true;
             variable.clear();
             variable.reserve(res.size());
@@ -536,35 +537,18 @@ class App {
             return (!variable.empty()) && retval;
         };
 
-        Option *opt = add_option(option_name, fun, option_description, false);
-        opt->type_name(detail::type_name<T>())->type_size(-1);
-        return opt;
-    }
-
-    /// Add option for vectors with defaulted argument
-    template <typename T>
-    Option *add_option(std::string option_name,
-                       std::vector<T> &variable, ///< The variable vector to set
-                       std::string option_description,
-                       bool defaulted) {
-
-        CLI::callback_t fun = [&variable](CLI::results_t res) {
-            bool retval = true;
-            variable.clear();
-            variable.reserve(res.size());
-            for(const auto &elem : res) {
-
-                variable.emplace_back();
-                retval &= detail::lexical_cast(elem, variable.back());
-            }
-            return (!variable.empty()) && retval;
+        auto default_function = [&variable]() {
+            std::vector<std::string> defaults;
+            defaults.resize(variable.size());
+            std::transform(variable.begin(), variable.end(), defaults.begin(), [](T &val) {
+                return std::string(CLI::detail::to_string(val));
+            });
+            return std::string("[" + detail::join(defaults) + "]");
         };
 
-        Option *opt = add_option(option_name, fun, option_description, defaulted);
+        Option *opt = add_option(option_name, fun, option_description, defaulted, default_function);
         opt->type_name(detail::type_name<T>())->type_size(-1);
 
-        if(defaulted)
-            opt->default_str("[" + detail::join(variable) + "]");
         return opt;
     }
 
@@ -995,13 +979,16 @@ class App {
             return worked;
         };
 
-        CLI::Option *opt = add_option(option_name, std::move(fun), std::move(option_description), defaulted);
-        opt->type_name(label)->type_size(2);
-        if(defaulted) {
+        auto default_function = [&variable]() {
             std::stringstream out;
             out << variable;
-            opt->default_str(out.str());
-        }
+            return out.str();
+        };
+
+        CLI::Option *opt =
+            add_option(option_name, std::move(fun), std::move(option_description), defaulted, default_function);
+
+        opt->type_name(label)->type_size(2);
         return opt;
     }
 
@@ -1295,7 +1282,7 @@ class App {
         std::vector<std::string> args;
         for(int i = argc - 1; i > 0; i--)
             args.emplace_back(argv[i]);
-        parse(args);
+        parse(std::move(args));
     }
 
     /// Parse a single string as if it contained command line arguments.
@@ -1325,7 +1312,7 @@ class App {
         args.erase(std::remove(args.begin(), args.end(), std::string{}), args.end());
         std::reverse(args.begin(), args.end());
 
-        parse(args);
+        parse(std::move(args));
     }
 
     /// The real work is done here. Expects a reversed vector.
@@ -1346,6 +1333,26 @@ class App {
         parsed_ = 0;
 
         _parse(args);
+        run_callback();
+    }
+
+    /// The real work is done here. Expects a reversed vector.
+    void parse(std::vector<std::string> &&args) {
+        // Clear if parsed
+        if(parsed_ > 0)
+            clear();
+
+        // parsed_ is incremented in commands/subcommands,
+        // but placed here to make sure this is cleared when
+        // running parse after an error is thrown, even by _validate or _configure.
+        parsed_ = 1;
+        _validate();
+        _configure();
+        // set the parent as nullptr as this object should be the top now
+        parent_ = nullptr;
+        parsed_ = 0;
+
+        _parse(std::move(args));
         run_callback();
     }
 
@@ -1755,6 +1762,13 @@ class App {
         return miss_list;
     }
 
+    /// This returns the missing options in a form ready for processing by another command line program
+    std::vector<std::string> remaining_for_passthrough(bool recurse = false) const {
+        std::vector<std::string> miss_list = remaining(recurse);
+        std::reverse(std::begin(miss_list), std::end(miss_list));
+        return miss_list;
+    }
+
     /// This returns the number of remaining options, minus the -- separator
     size_t remaining_size(bool recurse = false) const {
         auto remaining_options = static_cast<size_t>(std::count_if(
@@ -1878,7 +1892,7 @@ class App {
             return detail::Classifier::SHORT;
         if((allow_windows_style_options_) && (detail::split_windows_style(current, dummy1, dummy2)))
             return detail::Classifier::WINDOWS;
-        if((current == "++") && !name_.empty())
+        if((current == "++") && !name_.empty() && parent_ != nullptr)
             return detail::Classifier::SUBCOMMAND_TERMINATOR;
         return detail::Classifier::NONE;
     }
@@ -2107,6 +2121,21 @@ class App {
     }
 
     /// Throw an error if anything is left over and should not be.
+    void _process_extras() {
+        if(!(allow_extras_ || prefix_command_)) {
+            size_t num_left_over = remaining_size();
+            if(num_left_over > 0) {
+                throw ExtrasError(remaining(false));
+            }
+        }
+
+        for(App_p &sub : subcommands_) {
+            if(sub->count() > 0)
+                sub->_process_extras();
+        }
+    }
+
+    /// Throw an error if anything is left over and should not be.
     /// Modifies the args to fill in the missing items before throwing.
     void _process_extras(std::vector<std::string> &args) {
         if(!(allow_extras_ || prefix_command_)) {
@@ -2149,8 +2178,8 @@ class App {
             // Throw error if any items are left over (depending on settings)
             _process_extras(args);
 
-            // Convert missing (pairs) to extras (string only)
-            args = remaining(false);
+            // Convert missing (pairs) to extras (string only) ready for processing in another app
+            args = remaining_for_passthrough(false);
         } else if(immediate_callback_) {
             _process_env();
             _process_callbacks();
@@ -2158,6 +2187,23 @@ class App {
             _process_requirements();
             run_callback();
         }
+    }
+
+    /// Internal parse function
+    void _parse(std::vector<std::string> &&args) {
+        // this can only be called by the top level in which case parent == nullptr by definition
+        // operation is simplified
+        increment_parsed();
+        _trigger_pre_parse(args.size());
+        bool positional_only = false;
+
+        while(!args.empty()) {
+            _parse_single(args, positional_only);
+        }
+        _process();
+
+        // Throw error if any items are left over (depending on settings)
+        _process_extras();
     }
 
     /// Parse one config param, return false if not found in any subcommand, remove if it is
@@ -2227,6 +2273,7 @@ class App {
             }
             break;
         case detail::Classifier::SUBCOMMAND_TERMINATOR:
+            // treat this like a positional mark if in the parent app
             args.pop_back();
             retval = false;
             break;
