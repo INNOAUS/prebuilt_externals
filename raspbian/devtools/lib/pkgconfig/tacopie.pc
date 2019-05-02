@@ -1,4 +1,4 @@
-prefix=/git-root/prebuilt_externals/raspbian/devtools
+prefix=/git-innoaus/prebuilt_externals/raspbian/devtools
 libdir=${prefix}/lib
 includedir=${prefix}/include
 
