@@ -4,7 +4,7 @@
  *
  * DO NOT INCLUDE THIS FILE DIRECTLY; include pqxx/basic_connection instead.
  *
- * Copyright (c) 2000-2019, Jeroen T. Vermeulen.
+ * Copyright (c) 2006-2018, Jeroen T. Vermeulen.
  *
  * See COPYING for copyright license.  If you did not receive a file called
  * COPYING with this source code, please notify the distributor of this mistake,
@@ -27,11 +27,7 @@ namespace pqxx
 {
 
 /// Base-class template for all libpqxx connection types.
-/** @deprecated In libpqxx 7, all built-in connection types will be implemented
- * as a single class.  You'll specify the connection policy as an optional
- * constructor argument.
- *
- * Combines connection_base (the highly complex class implementing essentially
+/** Combines connection_base (the highly complex class implementing essentially
  * all connection-related functionality) with a connection policy (a simpler
  * helper class determining the rules that govern the process of setting up the
  * underlying connection to the backend).
@@ -42,31 +38,31 @@ namespace pqxx
  * allocated separately.  This also avoids the need for virtual functions in
  * this class.
  */
-template<typename CONNECTPOLICY> class basic_connection_base :
+template<typename CONNECTPOLICY> class basic_connection :
   public connection_base
 {
 public:
-  basic_connection_base() :
+  basic_connection() :
     connection_base(m_policy),
-    m_options(std::string{}),
+    m_options(std::string()),
     m_policy(m_options)
 	{ init(); }
 
   /// The parsing of options is the same as libpq's PQconnect.
   /// See: https://www.postgresql.org/docs/10/static/libpq-connect.html
-  explicit basic_connection_base(const std::string &opt) :
+  explicit basic_connection(const std::string &opt) :
     connection_base(m_policy),
     m_options(opt),
     m_policy(m_options)
 	{init();}
 
   /// See: @c basic_connection(const std::string &opt)
-  explicit basic_connection_base(const char opt[]) :
-    basic_connection_base(opt ? std::string{opt} : std::string{}) {}
+  explicit basic_connection(const char opt[]) :
+    basic_connection(opt ? std::string(opt) : std::string()) {}
 
-  explicit basic_connection_base(std::nullptr_t) : basic_connection_base() {}
+  explicit basic_connection(std::nullptr_t) : basic_connection() {}
 
-  ~basic_connection_base() noexcept
+  ~basic_connection() noexcept
 	{ close(); }
 
   const std::string &options() const noexcept				//[t01]
@@ -77,27 +73,6 @@ private:
   std::string m_options;
   /// Connection policy.  @warn Must be initialized after the connect string!
   CONNECTPOLICY m_policy;
-};
-
-
-/// Concrete connection type template.
-/** @deprecated In libpqxx 7, all built-in connection types will be implemented
- * as a single class.  You'll specify the connection policy as an optional
- * constructor argument.
- */
-template<typename CONNECTPOLICY> struct basic_connection :
-	basic_connection_base<CONNECTPOLICY>
-{
-  PQXX_DEPRECATED basic_connection() =default;
-  PQXX_DEPRECATED explicit basic_connection(const std::string &opt) :
-	basic_connection(opt) {}
-  PQXX_DEPRECATED explicit basic_connection(const char opt[]) :
-	basic_connection(opt) {}
-
-  PQXX_DEPRECATED explicit basic_connection(std::nullptr_t) :
-	basic_connection() {}
-
-  using basic_connection_base<CONNECTPOLICY>::options;
 };
 
 } // namespace

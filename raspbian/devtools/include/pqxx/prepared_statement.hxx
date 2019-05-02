@@ -2,7 +2,7 @@
  *
  * See the connection_base hierarchy for more about prepared statements.
  *
- * Copyright (c) 2000-2019, Jeroen T. Vermeulen.
+ * Copyright (c) 2006-2018, Jeroen T. Vermeulen.
  *
  * See COPYING for copyright license.  If you did not receive a file called
  * COPYING with this source code, please notify the distributor of this mistake,
@@ -81,7 +81,7 @@ namespace prepare
 class PQXX_LIBEXPORT invocation : internal::statement_parameters
 {
 public:
-  PQXX_DEPRECATED invocation(transaction_base &, const std::string &statement);
+  invocation(transaction_base &, const std::string &statement);
   invocation &operator=(const invocation &) =delete;
 
   /// Execute!

@@ -13,12 +13,9 @@ class PQXX_PRIVATE result_creation : callgate<const result>
 
   result_creation(reference x) : super(x) {}
 
-  static result create(
-        internal::pq::PGresult *rhs,
-        const std::string &query,
-        encoding_group enc)
+  static result create(internal::pq::PGresult *rhs, const std::string &query)
   {
-    return result(rhs, query, enc);
+    return result(rhs, query);
   }
 
   void check_status() const { return home().check_status(); }

@@ -5,7 +5,7 @@
  *
  * DO NOT INCLUDE THIS FILE DIRECTLY; include pqxx/transaction_base instead.
  *
- * Copyright (c) 2000-2019, Jeroen T. Vermeulen.
+ * Copyright (c) 2001-2018, Jeroen T. Vermeulen.
  *
  * See COPYING for copyright license.  If you did not receive a file called
  * COPYING with this source code, please notify the distributor of this mistake,
@@ -27,7 +27,6 @@
  */
 
 #include "pqxx/connection_base.hxx"
-#include "pqxx/internal/encoding_group.hxx"
 #include "pqxx/isolation.hxx"
 #include "pqxx/result.hxx"
 #include "pqxx/row.hxx"
@@ -44,9 +43,9 @@ class PQXX_LIBEXPORT transactionfocus : public virtual namedclass
 {
 public:
   explicit transactionfocus(transaction_base &t) :
-    namedclass{"transactionfocus"},
-    m_trans{t},
-    m_registered{false}
+    namedclass("transactionfocus"),
+    m_trans(t),
+    m_registered(false)
   {
   }
 
@@ -73,8 +72,7 @@ private:
 class PQXX_LIBEXPORT parameterized_invocation : statement_parameters
 {
 public:
-  PQXX_DEPRECATED parameterized_invocation(
-	connection_base &, const std::string &query);
+  parameterized_invocation(connection_base &, const std::string &query);
 
   parameterized_invocation &operator()() { add_param(); return *this; }
   parameterized_invocation &operator()(const binarystring &v)
@@ -91,8 +89,7 @@ public:
 
 private:
   /// Not allowed
-  parameterized_invocation &operator=(const parameterized_invocation &)
-	=delete;
+  parameterized_invocation &operator=(const parameterized_invocation &);
 
   connection_base &m_home;
   const std::string m_query;
@@ -106,10 +103,7 @@ namespace gate
 {
 class transaction_subtransaction;
 class transaction_tablereader;
-class transaction_sql_cursor;
-class transaction_stream_from;
 class transaction_tablewriter;
-class transaction_stream_to;
 class transaction_transactionfocus;
 } // namespace internal::gate
 } // namespace internal
@@ -224,10 +218,6 @@ public:
   /// Escape an SQL identifier for use in a query.
   std::string quote_name(const std::string &identifier) const
 				       { return conn().quote_name(identifier); }
-
-  /// Escape string for literal LIKE match.
-  std::string esc_like(const std::string &str, char escape_char='\\') const
-				   { return conn().esc_like(str, escape_char); }
   //@}
 
   /// Execute query
@@ -248,11 +238,11 @@ public:
    */
   result exec(
 	const std::string &Query,
-	const std::string &Desc=std::string{});				//[t01]
+	const std::string &Desc=std::string());				//[t01]
 
   result exec(
 	const std::stringstream &Query,
-	const std::string &Desc=std::string{})
+	const std::string &Desc=std::string())
 	{ return exec(Query.str(), Desc); }
 
   /// Execute query, which should zero rows of data.
@@ -263,7 +253,7 @@ public:
    */
   result exec0(
 	const std::string &Query,
-	const std::string &Desc=std::string{})
+	const std::string &Desc=std::string())
 	{ return exec_n(0, Query, Desc); }
 
   /// Execute query returning a single row of data.
@@ -273,7 +263,7 @@ public:
    *
    * @throw unexpected_rows If the query returned the wrong number of rows.
    */
-  row exec1(const std::string &Query, const std::string &Desc=std::string{})
+  row exec1(const std::string &Query, const std::string &Desc=std::string())
 	{ return exec_n(1, Query, Desc).front(); }
 
   /// Execute query, expect given number of rows.
@@ -285,7 +275,7 @@ public:
   result exec_n(
         size_t rows,
 	const std::string &Query,
-	const std::string &Desc=std::string{});
+	const std::string &Desc=std::string());
 
   /**
    * @name Parameterized statements
@@ -320,8 +310,7 @@ public:
   template<typename ...Args>
   result exec_params(const std::string &query, Args &&...args)
   {
-    return internal_exec_params(
-      query, internal::params(std::forward<Args>(args)...));
+    return internal_exec_params(query, internal::params(std::forward<Args>(args)...));
   }
 
   // Execute parameterised statement, expect a single-row result.
@@ -362,8 +351,7 @@ public:
    * This is the old, pre-C++11 way of handling parameterised statements.  As
    * of libpqxx 6.0, it's made much easier using variadic templates.
    */
-  PQXX_DEPRECATED internal::parameterized_invocation
-  parameterized(const std::string &query);
+  internal::parameterized_invocation parameterized(const std::string &query);
   //@}
 
   /**
@@ -395,8 +383,7 @@ public:
   template<typename ...Args>
   result exec_prepared(const std::string &statement, Args&&... args)
   {
-    return internal_exec_prepared(
-      statement, internal::params(std::forward<Args>(args)...));
+    return internal_exec_prepared(statement, internal::params(std::forward<Args>(args)...));
   }
 
   /// Execute a prepared statement, and expect a single-row result.
@@ -471,8 +458,7 @@ public:
    * If you leave out the statement name, the call refers to the nameless
    * statement instead.
    */
-  PQXX_DEPRECATED prepare::invocation
-  prepared(const std::string &statement=std::string{});
+  prepare::invocation prepared(const std::string &statement=std::string());
 
   //@}
 
@@ -598,7 +584,7 @@ private:
   PQXX_PRIVATE void CheckPendingError();
 
   template<typename T> bool parm_is_null(T *p) const noexcept
-	{ return p == nullptr; }
+	{ return !p; }
   template<typename T> bool parm_is_null(T) const noexcept
 	{ return false; }
 
@@ -626,12 +612,10 @@ private:
   PQXX_PRIVATE void register_pending_error(const std::string &) noexcept;
 
   friend class pqxx::internal::gate::transaction_tablereader;
-  friend class pqxx::internal::gate::transaction_stream_from;
   PQXX_PRIVATE void BeginCopyRead(const std::string &, const std::string &);
   bool read_copy_line(std::string &);
 
   friend class pqxx::internal::gate::transaction_tablewriter;
-  friend class pqxx::internal::gate::transaction_stream_to;
   PQXX_PRIVATE void BeginCopyWrite(
 	const std::string &Table,
 	const std::string &Columns);
@@ -652,4 +636,5 @@ private:
 } // namespace pqxx
 
 #include "pqxx/compiler-internal-post.hxx"
+
 #endif

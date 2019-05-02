@@ -4,7 +4,7 @@
  *
  * DO NOT INCLUDE THIS FILE DIRECTLY.  Other headers include it for you.
  *
- * Copyright (c) 2000-2019, Jeroen T. Vermeulen.
+ * Copyright (c) 2009-2018, Jeroen T. Vermeulen.
  *
  * See COPYING for copyright license.  If you did not receive a file called
  * COPYING with this source code, please notify the distributor of this mistake,
@@ -17,15 +17,20 @@
 #include "pqxx/compiler-internal-pre.hxx"
 
 #include <cstring>
-#include <iterator>
 #include <string>
 #include <vector>
+
+#if defined(PQXX_HAVE_OPTIONAL)
+#include <optional>
+#endif
+
+#if defined(PQXX_HAVE_EXP_OPTIONAL) && !defined(PQXX_HIDE_EXP_OPTIONAL)
+#include <experimental/optional>
+#endif
 
 #include "pqxx/binarystring"
 #include "pqxx/strconv"
 #include "pqxx/util"
-
-#include "pqxx/internal/type_utils.hxx"
 
 
 namespace pqxx
@@ -50,8 +55,8 @@ public:
 
   /// Wrap a container.
   template<typename C> explicit dynamic_params(const C &container) :
-        m_begin(std::begin(container)),
-        m_end(std::end(container))
+        m_begin(container.begin()),
+        m_end(container.end())
   {}
 
   IT begin() const { return m_begin; }
@@ -71,7 +76,7 @@ protected:
   void add_param() { this->add_checked_param("", false, false); }
   template<typename T> void add_param(const T &v, bool nonnull)
   {
-    nonnull = (nonnull && not pqxx::string_traits<T>::is_null(v));
+    nonnull = (nonnull && !pqxx::string_traits<T>::is_null(v));
     this->add_checked_param(
 	(nonnull ? pqxx::to_string(v) : ""),
 	nonnull,
@@ -187,11 +192,30 @@ private:
   /// Compile one argument (default, generic implementation).
   /** Uses string_traits to represent the argument as a std::string.
    */
-  template<typename Arg> void add_field(const Arg &arg)
+  template<typename Arg> void add_field(Arg arg)
   {
     if (string_traits<Arg>::is_null(arg)) add_field(nullptr);
     else add_field(to_string(arg));
   }
+
+#if defined(PQXX_HAVE_OPTIONAL)
+  /// Compile one argument (specialised for std::optional<type>).
+  template<typename Arg> void add_field(const std::optional<Arg> &arg)
+  {
+    if (arg.has_value()) add_field(arg.value());
+    else add_field(nullptr);
+  }
+#endif
+
+#if defined(PQXX_HAVE_EXP_OPTIONAL) && !defined(PQXX_HIDE_EXP_OPTIONAL)
+  /// Compile one argument (specialised for std::experimental::optional<type>).
+  template<typename Arg> void add_field(
+	const std::experimental::optional<Arg> &arg)
+  {
+    if (arg) add_field(arg.value());
+    else add_field(nullptr);
+  }
+#endif
 
   /// Compile a dynamic_params object into a dynamic number of parameters.
   template<typename IT> void add_field(const dynamic_params<IT> &parameters)

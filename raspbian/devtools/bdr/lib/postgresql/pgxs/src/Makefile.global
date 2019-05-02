@@ -414,9 +414,9 @@ PORTNAME= linux
 
 build_os = linux-gnueabihf
 
-host_tuple = armv6l-unknown-linux-gnueabihf
+host_tuple = armv7l-unknown-linux-gnueabihf
 host_os = linux-gnueabihf
-host_cpu = armv6l
+host_cpu = armv7l
 
 # Make HAVE_IPV6 available for initdb script creation
 HAVE_IPV6= yes

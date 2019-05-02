@@ -2,7 +2,7 @@
  *
  * DO NOT INCLUDE THIS FILE DIRECTLY; include pqxx/stringconv instead.
  *
- * Copyright (c) 2000-2019, Jeroen T. Vermeulen.
+ * Copyright (c) 2008-2017, Jeroen T. Vermeulen.
  *
  * See COPYING for copyright license.  If you did not receive a file called
  * COPYING with this source code, please notify the distributor of this mistake,
@@ -13,7 +13,6 @@
 
 #include "pqxx/compiler-public.hxx"
 
-#include <limits>
 #include <sstream>
 #include <stdexcept>
 
@@ -24,23 +23,12 @@ namespace pqxx
 /**
  * @defgroup stringconversion String conversion
  *
- * The PostgreSQL server accepts and represents data in string form.  It has
- * its own formats for various data types.  The string conversions define how
- * various C++ types translate to and from their respective PostgreSQL text
- * representations.
- *
- * Each conversion is defined by a specialisation of the @c string_traits
- * template.  This template implements some basic functions to support the
- * conversion, ideally in both directions.
- *
- * If you need to convert a type which is not supported out of the box, define
- * your own @c string_traits specialisation for that type, similar to the ones
- * defined here.  Any conversion code which "sees" your specialisation will now
- * support your conversion.  In particular, you'll be able to read result
- * fields into a variable of the new type.
- *
- * There is a macro to help you define conversions for individual enumeration
- * types.  The conversion will represent enumeration values as numeric strings.
+ * For purposes of communication with the server, values need to be converted
+ * from and to a human-readable string format that (unlike the various functions
+ * and templates in the C and C++ standard libraries) is not sensitive to locale
+ * settings and internationalization.  This section contains functionality that
+ * is used extensively by libpqxx itself, but is also available for use by other
+ * programs.
  */
 //@{
 
@@ -48,74 +36,34 @@ namespace pqxx
 /** Specialize this template for a type that you wish to add to_string and
  * from_string support for.
  */
-template<typename T, typename = void> struct string_traits;
+template<typename T> struct string_traits {};
 
 namespace internal
 {
 /// Throw exception for attempt to convert null to given type.
 [[noreturn]] PQXX_LIBEXPORT void throw_null_conversion(
 	const std::string &type);
-
-/// Give a human-readable name for a type, at compile time.
-/** Each instantiation contains a static member called @c value which is the
- * type's name, as a string.
- *
- * This template should not be around for long.  C++14's variable templates
- * make it easier (eliminating the cumbersome struct) and C++20's introspection
- * should obviate it completely.
- */
-template<typename TYPE> struct type_name;
-#define PQXX_DECLARE_TYPE_NAME(TYPE) \
-  template<> struct type_name<TYPE> \
-  { static constexpr const char *value = #TYPE; }
-
-PQXX_DECLARE_TYPE_NAME(bool);
-PQXX_DECLARE_TYPE_NAME(short);
-PQXX_DECLARE_TYPE_NAME(unsigned short);
-PQXX_DECLARE_TYPE_NAME(int);
-PQXX_DECLARE_TYPE_NAME(unsigned int);
-PQXX_DECLARE_TYPE_NAME(long);
-PQXX_DECLARE_TYPE_NAME(unsigned long);
-PQXX_DECLARE_TYPE_NAME(long long);
-PQXX_DECLARE_TYPE_NAME(unsigned long long);
-PQXX_DECLARE_TYPE_NAME(float);
-PQXX_DECLARE_TYPE_NAME(double);
-PQXX_DECLARE_TYPE_NAME(long double);
-PQXX_DECLARE_TYPE_NAME(char *);
-PQXX_DECLARE_TYPE_NAME(const char *);
-PQXX_DECLARE_TYPE_NAME(std::string);
-PQXX_DECLARE_TYPE_NAME(const std::string);
-PQXX_DECLARE_TYPE_NAME(std::stringstream);
-#undef PQXX_DECLARE_TYPE_NAME
-
-template<size_t N> struct type_name<char[N]>
-{ static constexpr const char *value = "char[]"; };
-
-
-/// Helper: string traits implementation for built-in types.
-/** These types all look much alike, so they can share much of their traits
- * classes (though templatised, of course).
- *
- * The actual `to_string` and `from_string` are implemented in the library,
- * but the rest is defined inline.
- */
-template<typename TYPE> struct PQXX_LIBEXPORT builtin_traits
-{
-  static constexpr const char *name() noexcept
-	{ return internal::type_name<TYPE>::value; }
-  static constexpr bool has_null() noexcept { return false; }
-  static bool is_null(TYPE) { return false; }
-  [[noreturn]] static TYPE null() { throw_null_conversion(name()); }
-  static void from_string(const char Str[], TYPE &Obj);
-  static std::string to_string(TYPE Obj);
-};
 } // namespace pqxx::internal
 
 
-/// Helper: declare a string_traits specialisation for a builtin type.
-#define PQXX_DECLARE_STRING_TRAITS_SPECIALIZATION(TYPE) \
-  template<> struct PQXX_LIBEXPORT string_traits<TYPE> : \
-    internal::builtin_traits<TYPE> {};
+/** Helper: declare a typical string_traits specialisation.
+ *
+ * It'd be great to do this without a preprocessor macro.  The problem is
+ * that we want to represent the parameter type's name to programmers.
+ * There's probably a better way in newer C++ versions, but I don't think there
+ * is one in C++11.
+ */
+#define PQXX_DECLARE_STRING_TRAITS_SPECIALIZATION(T)			\
+template<> struct PQXX_LIBEXPORT string_traits<T>			\
+{									\
+  static constexpr const char *name() noexcept { return #T; }		\
+  static constexpr bool has_null() noexcept { return false; }		\
+  static bool is_null(T) { return false; }				\
+  [[noreturn]] static T null() 						\
+    { internal::throw_null_conversion(name()); }			\
+  static void from_string(const char Str[], T &Obj);			\
+  static std::string to_string(T Obj);					\
+};
 
 PQXX_DECLARE_STRING_TRAITS_SPECIALIZATION(bool)
 
@@ -134,67 +82,12 @@ PQXX_DECLARE_STRING_TRAITS_SPECIALIZATION(long double)
 
 #undef PQXX_DECLARE_STRING_TRAITS_SPECIALIZATION
 
-
-/// Helper class for defining enum conversions.
-/** The conversion will convert enum values to numeric strings, and vice versa.
- *
- * To define a string conversion for an enum type, derive a @c string_traits
- * specialisation for the enum from this struct.
- *
- * There's usually an easier way though: the @c PQXX_DECLARE_ENUM_CONVERSION
- * macro.  Use @c enum_traits manually only if you need to customise your
- * traits type in more detail, e.g. if your enum has a "null" value built in.
- */
-template<typename ENUM>
-struct enum_traits
-{
-  using underlying_type = typename std::underlying_type<ENUM>::type;
-  using underlying_traits = string_traits<underlying_type>;
-
-  static constexpr bool has_null() noexcept { return false; }
-  [[noreturn]] static ENUM null()
-	{ internal::throw_null_conversion("enum type"); }
-
-  static void from_string(const char Str[], ENUM &Obj)
-  {
-    underlying_type tmp;
-    underlying_traits::from_string(Str, tmp);
-    Obj = ENUM(tmp);
-  }
-
-  static std::string to_string(ENUM Obj)
-	{ return underlying_traits::to_string(underlying_type(Obj)); }
-};
-
-
-/// Macro: Define a string conversion for an enum type.
-/** This specialises the @c pqxx::string_traits template, so use it in the
- * @c ::pqxx namespace.
- *
- * For example:
- *
- *      #include <iostream>
- *      #include <pqxx/strconv>
- *      enum X { xa, xb };
- *      namespace pqxx { PQXX_DECLARE_ENUM_CONVERSION(x); }
- *      int main() { std::cout << to_string(xa) << std::endl; }
- */
-#define PQXX_DECLARE_ENUM_CONVERSION(ENUM) \
-template<> \
-struct string_traits<ENUM> : pqxx::enum_traits<ENUM> \
-{ \
-  static constexpr const char *name() noexcept { return #ENUM; } \
-  [[noreturn]] static ENUM null() \
-	{ internal::throw_null_conversion(name()); } \
-}
-
-
 /// String traits for C-style string ("pointer to const char")
 template<> struct PQXX_LIBEXPORT string_traits<const char *>
 {
   static constexpr const char *name() noexcept { return "const char *"; }
   static constexpr bool has_null() noexcept { return true; }
-  static bool is_null(const char *t) { return t == nullptr; }
+  static bool is_null(const char *t) { return !t; }
   static const char *null() { return nullptr; }
   static void from_string(const char Str[], const char *&Obj) { Obj = Str; }
   static std::string to_string(const char *Obj) { return Obj; }
@@ -205,7 +98,7 @@ template<> struct PQXX_LIBEXPORT string_traits<char *>
 {
   static constexpr const char *name() noexcept { return "char *"; }
   static constexpr bool has_null() noexcept { return true; }
-  static bool is_null(const char *t) { return t == nullptr; }
+  static bool is_null(const char *t) { return !t; }
   static const char *null() { return nullptr; }
 
   // Don't allow this conversion since it breaks const-safety.
@@ -219,7 +112,7 @@ template<size_t N> struct PQXX_LIBEXPORT string_traits<char[N]>
 {
   static constexpr const char *name() noexcept { return "char[]"; }
   static constexpr bool has_null() noexcept { return true; }
-  static bool is_null(const char t[]) { return t == nullptr; }
+  static bool is_null(const char t[]) { return !t; }
   static const char *null() { return nullptr; }
   static std::string to_string(const char Obj[]) { return Obj; }
 };
@@ -229,8 +122,8 @@ template<> struct PQXX_LIBEXPORT string_traits<std::string>
   static constexpr const char *name() noexcept { return "string"; }
   static constexpr bool has_null() noexcept { return false; }
   static bool is_null(const std::string &) { return false; }
-  [[noreturn]] static std::string null()
-	{ internal::throw_null_conversion(name()); }
+  static std::string null()
+	{ internal::throw_null_conversion(name()); return std::string(); }
   static void from_string(const char Str[], std::string &Obj) { Obj=Str; }
   static std::string to_string(const std::string &Obj) { return Obj; }
 };
@@ -240,8 +133,8 @@ template<> struct PQXX_LIBEXPORT string_traits<const std::string>
   static constexpr const char *name() noexcept { return "const string"; }
   static constexpr bool has_null() noexcept { return false; }
   static bool is_null(const std::string &) { return false; }
-  [[noreturn]] static const std::string null()
-	{ internal::throw_null_conversion(name()); }
+  static const std::string null()
+	{ internal::throw_null_conversion(name()); return std::string(); }
   static const std::string to_string(const std::string &Obj) { return Obj; }
 };
 
@@ -250,8 +143,12 @@ template<> struct PQXX_LIBEXPORT string_traits<std::stringstream>
   static constexpr const char *name() noexcept { return "stringstream"; }
   static constexpr bool has_null() noexcept { return false; }
   static bool is_null(const std::stringstream &) { return false; }
-  [[noreturn]] static std::stringstream null()
-	{ internal::throw_null_conversion(name()); }
+  static std::stringstream null()
+  {
+    internal::throw_null_conversion(name());
+    // No, dear compiler, we don't need a return here.
+    throw 0;
+  }
   static void from_string(const char Str[], std::stringstream &Obj)
 	{ Obj.clear(); Obj << Str; }
   static std::string to_string(const std::stringstream &Obj)
@@ -259,7 +156,7 @@ template<> struct PQXX_LIBEXPORT string_traits<std::stringstream>
 };
 
 
-// TODO: Implement date conversions.
+// TODO: Implement date conversions
 
 /// Attempt to convert postgres-generated string to given built-in type
 /** If the form of the value found in the string does not match the expected
@@ -277,7 +174,7 @@ template<> struct PQXX_LIBEXPORT string_traits<std::stringstream>
 template<typename T>
   inline void from_string(const char Str[], T &Obj)
 {
-  if (Str == nullptr) throw std::runtime_error{"Attempt to read null string."};
+  if (!Str) throw std::runtime_error("Attempt to read null string");
   string_traits<T>::from_string(Str, Obj);
 }
 
@@ -300,7 +197,7 @@ template<>
 	std::string &Obj,
 	size_t len)
 {
-  if (Str == nullptr) throw std::runtime_error{"Attempt to read null string."};
+  if (!Str) throw std::runtime_error("Attempt to read null string");
   Obj.assign(Str, len);
 }
 
@@ -320,8 +217,8 @@ from_string(const std::string &Str, std::string &Obj)			//[t46]
 namespace internal
 {
 /// Compute numeric value of given textual digit (assuming that it is a digit)
-constexpr int digit_to_number(char c) noexcept { return c-'0'; }
-constexpr char number_to_digit(int i) noexcept
+inline int digit_to_number(char c) noexcept { return c-'0'; }
+inline char number_to_digit(int i) noexcept
 	{ return static_cast<char>(i+'0'); }
 } // namespace pqxx::internal
 

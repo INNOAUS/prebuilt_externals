@@ -42,14 +42,12 @@ class PQXX_PRIVATE connection_transaction : callgate<connection_base>
 	const int binaries[],
 	int nparams)
   {
-#include <pqxx/internal/ignore-deprecated-pre.hxx>
     return home().prepared_exec(
 	statement,
 	params,
 	paramlengths,
 	binaries,
 	nparams);
-#include <pqxx/internal/ignore-deprecated-post.hxx>
   }
 
   result exec_prepared(

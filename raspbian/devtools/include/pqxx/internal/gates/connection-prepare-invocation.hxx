@@ -25,14 +25,12 @@ class PQXX_PRIVATE connection_prepare_invocation : callgate<connection_base>
 	const int binary[],
 	int nparams)
   {
-#include <pqxx/internal/ignore-deprecated-pre.hxx>
     return home().prepared_exec(
 	statement,
 	params,
 	paramlengths,
 	binary,
 	nparams);
-#include <pqxx/internal/ignore-deprecated-post.hxx>
   }
 
   bool prepared_exists(const std::string &statement) const

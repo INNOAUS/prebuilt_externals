@@ -4,7 +4,7 @@
  *
  * DO NOT INCLUDE THIS FILE DIRECTLY; include pqxx/field instead.
  *
- * Copyright (c) 2000-2019, Jeroen T. Vermeulen.
+ * Copyright (c) 2001-2018, Jeroen T. Vermeulen.
  *
  * See COPYING for copyright license.  If you did not receive a file called
  * COPYING with this source code, please notify the distributor of this mistake,
@@ -15,10 +15,10 @@
 
 #include "pqxx/compiler-public.hxx"
 #include "pqxx/compiler-internal-pre.hxx"
-#include "pqxx/internal/type_utils.hxx"
 
 #if defined(PQXX_HAVE_OPTIONAL)
 #include <optional>
+#endif
 
 /* Use std::experimental::optional as a fallback for std::optional, if
  * present.
@@ -28,7 +28,7 @@
  * using or supporting std::experimental::optional, define a macro
  * PQXX_HIDE_EXP_OPTIONAL when building your software.
  */
-#elif defined(PQXX_HAVE_EXP_OPTIONAL) && !defined(PQXX_HIDE_EXP_OPTIONAL)
+#if defined(PQXX_HAVE_EXP_OPTIONAL) && !defined(PQXX_HIDE_EXP_OPTIONAL)
 #include <experimental/optional>
 #endif
 
@@ -85,7 +85,7 @@ public:
   /** @warning See operator==() for important information about this operator
    */
   bool operator!=(const field &rhs) const				//[t82]
-						   {return not operator==(rhs);}
+						    {return !operator==(rhs);}
   //@}
 
   /**
@@ -129,17 +129,10 @@ public:
   size_type size() const noexcept;					//[t11]
 
   /// Read value into Obj; or leave Obj untouched and return @c false if null
-  /** Note this can be used with optional types (except pointers other than
-   * C-strings)
-   */
-  template<typename T> auto to(T &Obj) const				//[t03]
-    -> typename std::enable_if<(
-      not std::is_pointer<T>::value
-      or std::is_same<T, const char*>::value
-    ), bool>::type
+  template<typename T> bool to(T &Obj) const				//[t03]
   {
     const char *const bytes = c_str();
-    if (bytes[0] == '\0' and is_null()) return false;
+    if (!bytes[0] && is_null()) return false;
     from_string(bytes, Obj);
     return true;
   }
@@ -149,17 +142,10 @@ public:
       { return to(Obj); }
 
   /// Read value into Obj; or use Default & return @c false if null
-  /** Note this can be used with optional types (except pointers other than
-   * C-strings)
-   */
-  template<typename T> auto to(T &Obj, const T &Default) const	//[t12]
-    -> typename std::enable_if<(
-      not std::is_pointer<T>::value
-      or std::is_same<T, const char*>::value
-    ), bool>::type
+  template<typename T> bool to(T &Obj, const T &Default) const	//[t12]
   {
     const bool NotNull = to(Obj);
-    if (not NotNull) Obj = Default;
+    if (!NotNull) Obj = Default;
     return NotNull;
   }
 
@@ -175,30 +161,23 @@ public:
   }
 
   /// Return value as object of given type, or throw exception if null
-  /** Use as `as<std::optional<int>>()` or `as<my_untemplated_optional_t>()` as
-   * an alternative to `get<int>()`; this is disabled for use with raw pointers
-   * (other than C-strings) because storage for the value can't safely be
-   * allocated here
-   */
   template<typename T> T as() const					//[t45]
   {
     T Obj;
-    if (not to(Obj)) Obj = string_traits<T>::null();
+    const bool NotNull = to(Obj);
+    if (!NotNull) Obj = string_traits<T>::null();
     return Obj;
   }
 
-  /// Return value wrapped in some optional type (empty for nulls)
-  /** Use as `get<int>()` as before to obtain previous behavior (i.e. only
-   * usable when `std::optional` or `std::experimental::optional` are
-   * available), or specify container type with `get<int, std::optional>()`
-   */
-  template<typename T, template<typename> class O
 #if defined(PQXX_HAVE_OPTIONAL)
-    = std::optional
+  /// Return value as std::optional, or blank value if null.
+  template<typename T> std::optional<T> get() const
+	{ return get_opt<T, std::optional<T>>(); }
 #elif defined(PQXX_HAVE_EXP_OPTIONAL) && !defined(PQXX_HIDE_EXP_OPTIONAL)
-    = std::experimental::optional
+  /// Return value as std::experimental::optional, or blank value if null.
+  template<typename T> std::experimental::optional<T> get() const
+	{ return get_opt<T, std::experimental::optional<T>>(); }
 #endif
-  > constexpr O<T> get() const { return as<O<T>>(); }
 
   /// Parse the field as an SQL array.
   /** Call the parser to retrieve values (and structure) from the array.
@@ -207,8 +186,7 @@ public:
    * you keep the @c row of @c field object alive, it will keep the @c result
    * object alive as well.
    */
-  array_parser as_array() const
-        { return array_parser{c_str(), m_home.m_encoding}; }
+  array_parser as_array() const { return array_parser(c_str()); }
   //@}
 
 
@@ -224,6 +202,18 @@ protected:
   long m_col;
 
 private:
+  /// Implementation for get().
+  /**
+   * Abstracts away the difference between std::optional and
+   * std::experimental::optional.  Both can be supported at the same time,
+   * so pre-C++17 code can still work once the compiler defaults to C++17.
+   */
+  template<typename T, typename OPTIONAL_T> OPTIONAL_T get_opt() const
+  {
+    if (is_null()) return OPTIONAL_T();
+    else return OPTIONAL_T(as<T>());
+  }
+
   result m_home;
   size_t m_row;
 };
@@ -234,8 +224,8 @@ template<>
 inline bool field::to<std::string>(std::string &Obj) const
 {
   const char *const bytes = c_str();
-  if (bytes[0] == '\0' and is_null()) return false;
-  Obj = std::string{bytes, size()};
+  if (!bytes[0] && is_null()) return false;
+  Obj = std::string(bytes, size());
   return true;
 }
 
@@ -268,7 +258,7 @@ public:
   using seekdir = std::ios::seekdir;
 
   explicit field_streambuf(const field &F) :			//[t74]
-    m_field{F}
+    m_field(F)
   {
     initialize();
   }
@@ -321,7 +311,7 @@ public:
   using pos_type = typename traits_type::pos_type;
   using off_type = typename traits_type::off_type;
 
-  basic_fieldstream(const field &F) : super{nullptr}, m_buf{F}
+  basic_fieldstream(const field &F) : super(nullptr), m_buf(F)
 	{ super::init(&m_buf); }
 
 private:

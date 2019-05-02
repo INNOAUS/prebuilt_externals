@@ -4,7 +4,7 @@
  *
  * DO NOT INCLUDE THIS FILE DIRECTLY; include pqxx/tablewriter.hxx instead.
  *
- * Copyright (c) 2000-2019, Jeroen T. Vermeulen.
+ * Copyright (c) 2001-2018, Jeroen T. Vermeulen.
  *
  * See COPYING for copyright license.  If you did not receive a file called
  * COPYING with this source code, please notify the distributor of this mistake,
@@ -23,26 +23,23 @@
 
 namespace pqxx
 {
-/// @deprecated Use stream_to instead.
-/** Efficiently write data directly to a database table.
- * @warning This class does not work reliably with multibyte encodings.  Using
+/// @deprecated Efficiently write data directly to a database table.
+/** @warning This class does not work reliably with multibyte encodings.  Using
  * it with some multi-byte encodings may pose a security risk.
  */
 class PQXX_LIBEXPORT tablewriter : public tablestream
 {
 public:
-  PQXX_DEPRECATED tablewriter(
+  tablewriter(
 	transaction_base &,
 	const std::string &WName,
-	const std::string &Null=std::string{});
-  template<typename ITER>
-        PQXX_DEPRECATED tablewriter(
+	const std::string &Null=std::string());
+  template<typename ITER> tablewriter(
 	transaction_base &,
 	const std::string &WName,
 	ITER begincolumns,
 	ITER endcolumns);
-  template<typename ITER>
-        PQXX_DEPRECATED tablewriter(
+  template<typename ITER> tablewriter(
 	transaction_base &T,
 	const std::string &WName,
 	ITER begincolumns,
@@ -61,10 +58,10 @@ public:
   virtual void complete() override;
   void write_raw_line(const std::string &);
 private:
-  void set_up(
+  void setup(
 	transaction_base &,
 	const std::string &WName,
-	const std::string &Columns = std::string{});
+	const std::string &Columns = std::string());
   PQXX_PRIVATE void writer_close();
 };
 } // namespace pqxx
@@ -73,13 +70,12 @@ private:
 namespace std
 {
 template<>
-  class back_insert_iterator<pqxx::tablewriter>
+  class back_insert_iterator<pqxx::tablewriter> :
+	public iterator<output_iterator_tag, void,void,void,void>
 {
 public:
-  using iterator_category = output_iterator_tag;
-
   explicit back_insert_iterator(pqxx::tablewriter &W) noexcept :
-    m_writer{&W} {}
+    m_writer(&W) {}
 
   back_insert_iterator &
     operator=(const back_insert_iterator &rhs) noexcept
@@ -112,10 +108,10 @@ template<typename ITER> inline tablewriter::tablewriter(
 	const std::string &WName,
 	ITER begincolumns,
 	ITER endcolumns) :
-  namedclass{"tablewriter", WName},
-  tablestream{T, std::string{}}
+  namedclass("tablewriter", WName),
+  tablestream(T, std::string())
 {
-  set_up(T, WName, columnlist(begincolumns, endcolumns));
+  setup(T, WName, columnlist(begincolumns, endcolumns));
 }
 
 
@@ -125,10 +121,10 @@ template<typename ITER> inline tablewriter::tablewriter(
 	ITER begincolumns,
 	ITER endcolumns,
 	const std::string &Null) :
-  namedclass{"tablewriter", WName},
-  tablestream{T, Null}
+  namedclass("tablewriter", WName),
+  tablestream(T, Null)
 {
-  set_up(T, WName, columnlist(begincolumns, endcolumns));
+  setup(T, WName, columnlist(begincolumns, endcolumns));
 }
 
 
@@ -146,7 +142,7 @@ inline std::string escape_any(
 inline std::string escape_any(
 	const char s[],
 	const std::string &null)
-{ return s ? escape(std::string{s}, null) : "\\N"; }
+{ return s ? escape(std::string(s), null) : "\\N"; }
 
 template<typename T> inline std::string escape_any(
 	const T &t,
@@ -158,7 +154,7 @@ template<typename IT> class Escaper
 {
   const std::string &m_null;
 public:
-  explicit Escaper(const std::string &null) : m_null{null} {}
+  explicit Escaper(const std::string &null) : m_null(null) {}
   std::string operator()(IT i) const { return escape_any(*i, m_null); }
 };
 }
@@ -167,12 +163,12 @@ public:
 template<typename IT>
 inline std::string tablewriter::generate(IT Begin, IT End) const
 {
-  return separated_list("\t", Begin, End, internal::Escaper<IT>{NullStr()});
+  return separated_list("\t", Begin, End, internal::Escaper<IT>(NullStr()));
 }
 template<typename TUPLE>
 inline std::string tablewriter::generate(const TUPLE &T) const
 {
-  return generate(std::begin(T), std::end(T));
+  return generate(T.begin(), T.end());
 }
 
 template<typename IT> inline void tablewriter::insert(IT Begin, IT End)
@@ -182,7 +178,7 @@ template<typename IT> inline void tablewriter::insert(IT Begin, IT End)
 
 template<typename TUPLE> inline void tablewriter::insert(const TUPLE &T)
 {
-  insert(std::begin(T), std::end(T));
+  insert(T.begin(), T.end());
 }
 
 template<typename IT>
@@ -194,7 +190,7 @@ inline void tablewriter::push_back(IT Begin, IT End)
 template<typename TUPLE>
 inline void tablewriter::push_back(const TUPLE &T)
 {
-  insert(std::begin(T), std::end(T));
+  insert(T.begin(), T.end());
 }
 
 template<typename TUPLE>

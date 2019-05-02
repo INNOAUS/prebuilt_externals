@@ -4,7 +4,7 @@
  *
  * DO NOT INCLUDE THIS FILE DIRECTLY; include pqxx/robusttransaction instead.
  *
- * Copyright (c) 2000-2019, Jeroen T. Vermeulen.
+ * Copyright (c) 2002-2018, Jeroen T. Vermeulen.
  *
  * See COPYING for copyright license.  If you did not receive a file called
  * COPYING with this source code, please notify the distributor of this mistake,
@@ -40,7 +40,7 @@ protected:
   basic_robusttransaction(
 	connection_base &C,
 	const std::string &IsolationLevel,
-	const std::string &table_name=std::string{});			//[t16]
+	const std::string &table_name=std::string());			//[t16]
 
 private:
   using IDType = unsigned long;
@@ -149,8 +149,8 @@ public:
    */
   explicit robusttransaction(
 	connection_base &C,
-	const std::string &Name=std::string{}) :
-    namedclass{fullname("robusttransaction",isolation_tag::name()), Name},
+	const std::string &Name=std::string()) :
+    namedclass(fullname("robusttransaction",isolation_tag::name()), Name),
     internal::basic_robusttransaction(C, isolation_tag::name())
 	{ Begin(); }
 

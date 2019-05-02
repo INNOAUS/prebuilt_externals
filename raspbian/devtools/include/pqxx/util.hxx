@@ -2,7 +2,7 @@
  *
  * DO NOT INCLUDE THIS FILE DIRECTLY; include pqxx/util instead.
  *
- * Copyright (c) 2000-2019, Jeroen T. Vermeulen.
+ * Copyright (c) 2001-2018, Jeroen T. Vermeulen.
  *
  * See COPYING for copyright license.  If you did not receive a file called
  * COPYING with this source code, please notify the distributor of this mistake,
@@ -15,11 +15,9 @@
 
 #include <cstdio>
 #include <cctype>
-#include <iterator>
 #include <memory>
 #include <stdexcept>
 #include <string>
-#include <type_traits>
 #include <typeinfo>
 #include <vector>
 
@@ -37,7 +35,6 @@ namespace pqxx
 /// Suppress compiler warning about an unused item.
 template<typename T> inline void ignore_unused(T) {}
 
-
 /// Descriptor of library's thread-safety model.
 /** This describes what the library knows about various risks to thread-safety.
  */
@@ -47,6 +44,13 @@ struct PQXX_LIBEXPORT thread_safety_model
   bool have_safe_strerror = true;
 
   /// Is the underlying libpq build thread-safe?
+  /** A @c "false" here may mean one of two things: either the libpq build is
+   * not thread-safe, or it is a thread-safe build of an older version that did
+   * not offer thread-safety information.
+   *
+   * In that case, the best fix is to rebuild libpqxx against (a thread-safe
+   * build of) a newer libpq version.
+   */
   bool safe_libpq;
 
   /// @deprecated Query cancel is always thread-safe now.
@@ -82,7 +86,7 @@ constexpr oid oid_none = 0;
  */
 //@{
 
-/// Represent sequence of values as a string, joined by a given separator.
+/// Represent sequence of values as a separated string.
 /**
  * Use this to turn e.g. the numbers 1, 2, and 3 into a string "1, 2, 3".
  *
@@ -119,76 +123,9 @@ separated_list(const std::string &sep, ITER begin, ITER end)		//[t00]
 
 
 /// Render items in a container as a string, using given separator.
-template<typename CONTAINER> inline auto
+template<typename CONTAINER> inline std::string
 separated_list(const std::string &sep, const CONTAINER &c)		//[t10]
-	/*
-	Always std::string; necessary because SFINAE doesn't work with the
-	contents of function bodies, so the check for iterability has to be in
-	the signature.
-	*/
-	-> typename std::enable_if<
-		(
-			not std::is_void<decltype(std::begin(c))>::value
-			and not std::is_void<decltype(std::end(c))>::value
-		),
-		std::string
-	>::type
-{
-  return separated_list(sep, std::begin(c), std::end(c));
-}
-
-
-/// Render items in a tuple as a string, using given separator.
-template<
-	typename TUPLE,
-	std::size_t INDEX=0,
-	typename ACCESS,
-	typename std::enable_if<
-		(INDEX == std::tuple_size<TUPLE>::value-1),
-		int
-	>::type=0
->
-inline std::string
-separated_list(
-	const std::string & /* sep */,
-	const TUPLE &t,
-	const ACCESS& access
-)
-{
-  return to_string(access(&std::get<INDEX>(t)));
-}
-
-template<
-	typename TUPLE,
-	std::size_t INDEX=0,
-	typename ACCESS,
-	typename std::enable_if<
-		(INDEX < std::tuple_size<TUPLE>::value-1),
-		int
-	>::type=0
->
-inline std::string
-separated_list(const std::string &sep, const TUPLE &t, const ACCESS& access)
-{
-  return
-	to_string(access(&std::get<INDEX>(t))) +
-	sep +
-	separated_list<TUPLE, INDEX+1>(sep, t, access);
-}
-
-template<
-	typename TUPLE,
-	std::size_t INDEX=0,
-	typename std::enable_if<
-		(INDEX <= std::tuple_size<TUPLE>::value),
-		int
-	>::type=0
->
-inline std::string
-separated_list(const std::string &sep, const TUPLE &t)
-{
-  return separated_list(sep, t, [](const TUPLE &tup){return *tup;});
-}
+	{ return separated_list(sep, c.begin(), c.end()); }
 //@}
 
 
@@ -234,14 +171,14 @@ class PQXX_LIBEXPORT namedclass
 {
 public:
   explicit namedclass(const std::string &Classname) :
-    m_classname{Classname},
-    m_name{}
+    m_classname(Classname),
+    m_name()
   {
   }
 
   namedclass(const std::string &Classname, const std::string &Name) :
-    m_classname{Classname},
-    m_name{Name}
+    m_classname(Classname),
+    m_name(Name)
   {
   }
 
@@ -302,6 +239,16 @@ private:
  * a zero or negative sleep time is requested.
  */
 PQXX_LIBEXPORT void sleep_seconds(int);
+
+/// Work around problem with library export directives and pointers.
+using cstring = const char *;
+
+
+/// Commonly used SQL commands
+constexpr char
+        sql_begin_work[] = "BEGIN",
+        sql_commit_work[] = "COMMIT",
+        sql_rollback_work[] = "ROLLBACK";
 
 } // namespace internal
 } // namespace pqxx

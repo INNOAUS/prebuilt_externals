@@ -4,7 +4,7 @@
  *
  * DO NOT INCLUDE THIS FILE DIRECTLY; include pqxx/tablestream instead.
  *
- * Copyright (c) 2000-2019, Jeroen T. Vermeulen.
+ * Copyright (c) 2001-2018, Jeroen T. Vermeulen.
  *
  * See COPYING for copyright license.  If you did not receive a file called
  * COPYING with this source code, please notify the distributor of this mistake,
@@ -20,16 +20,14 @@
 
 namespace pqxx
 {
-/// Base class for obsolete tablereader/tablewriter classes.
-/** @deprecated Use stream_from and stream_to instead.
- */
+/// @deprecated Base class for obsolete tablereader/tablewriter classes.
 class PQXX_LIBEXPORT PQXX_NOVTABLE tablestream :
   public internal::transactionfocus
 {
 public:
   explicit tablestream(
 	transaction_base &Trans,
-	const std::string &Null=std::string{});
+	const std::string &Null=std::string());
   virtual ~tablestream() noexcept =0;
   virtual void complete() =0;
 protected:
@@ -41,10 +39,9 @@ protected:
 private:
   std::string m_null;
   bool m_finished = false;
-
-  tablestream() =delete;
-  tablestream(const tablestream &) =delete;
-  tablestream &operator=(const tablestream &) =delete;
+  tablestream();
+  tablestream(const tablestream &);
+  tablestream &operator=(const tablestream &);
 };
 
 

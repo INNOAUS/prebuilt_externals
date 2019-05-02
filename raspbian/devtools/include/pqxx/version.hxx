@@ -2,7 +2,7 @@
  *
  * DO NOT INCLUDE THIS FILE DIRECTLY; include pqxx/version instead.
  *
- * Copyright (c) 2000-2019, Jeroen T. Vermeulen.
+ * Copyright (c) 2009-2018, Jeroen T. Vermeulen.
  *
  * See COPYING for copyright license.  If you did not receive a file called
  * COPYING with this source code, please notify the distributor of this mistake,
@@ -14,14 +14,14 @@
 #include "pqxx/compiler-internal-pre.hxx"
 
 /// Full libpqxx version string.
-#define PQXX_VERSION "6.4.4"
+#define PQXX_VERSION "6.2.4"
 /// Library ABI version.
-#define PQXX_ABI "6.4"
+#define PQXX_ABI "6.2"
 
 /// Major version number.
 #define PQXX_VERSION_MAJOR 6
 /// Minor version number.
-#define PQXX_VERSION_MINOR 4
+#define PQXX_VERSION_MINOR 2
 
 namespace pqxx
 {

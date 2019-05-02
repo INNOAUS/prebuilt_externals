@@ -4,7 +4,7 @@
  *
  * DO NOT INCLUDE THIS FILE DIRECTLY; include pqxx/nontransaction instead.
  *
- * Copyright (c) 2000-2019, Jeroen T. Vermeulen.
+ * Copyright (c) 2002-2018, Jeroen T. Vermeulen.
  *
  * See COPYING for copyright license.  If you did not receive a file called
  * COPYING with this source code, please notify the distributor of this mistake,
@@ -62,8 +62,8 @@ public:
    */
   explicit nontransaction(						//[t14]
 	connection_base &C,
-	const std::string &Name=std::string{}) :
-    namedclass{"nontransaction", Name}, transaction_base{C} { Begin(); }
+	const std::string &Name=std::string()) :
+    namedclass("nontransaction", Name), transaction_base(C) { Begin(); }
 
   virtual ~nontransaction();						//[t14]
 
@@ -77,4 +77,5 @@ private:
 } // namespace pqxx
 
 #include "pqxx/compiler-internal-post.hxx"
+
 #endif
