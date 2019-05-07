@@ -13,7 +13,7 @@
 # and add symbolic links to their hash values.
 
 my $dir = "";
-my $prefix = "";
+my $prefix = "/home/rainpass/git-innoaus/prebuilt_externals/centos/devtools";
 
 my $errorcount = 0;
 my $openssl = $ENV{OPENSSL} || "openssl";

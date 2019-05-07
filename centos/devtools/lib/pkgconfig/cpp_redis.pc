@@ -1,4 +1,4 @@
-prefix=/home/leo/git-innoaus/prebuilt_externals/centos/devtools
+prefix=/home/rainpass/git-innoaus/prebuilt_externals/centos/devtools
 libdir=${prefix}/lib
 includedir=${prefix}/include
 
