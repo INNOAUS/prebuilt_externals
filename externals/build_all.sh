@@ -53,12 +53,28 @@ BUILD_ROOT=$PWD
 
 #cd $BUILD_ROOT
 
-cd restbed
-git clone --recursive https://github.com/Corvusoft/restbed.git
-cd restbed
+#cd restbed
+#git clone --recursive https://github.com/Corvusoft/restbed.git
+#cd restbed
+#mkdir build && cd build
+#cmake .. -DBUILD_SSL=NO -DCMAKE_CXX_FLAGS=-fPIC -DCMAKE_INSTALL_PREFIX=$HOME/git-innoaus/prebuilt_libs_macosx
+#make -j8
+#make install
+
+#cd $BUILD_ROOT
+
+cd libexpat 
+tar xvfz R_2_2_6.tar.gz
+cd libexpat-R_2_2_6/expat
 mkdir build && cd build
-cmake .. -DBUILD_SSL=NO -DCMAKE_CXX_FLAGS=-fPIC -DCMAKE_INSTALL_PREFIX=$HOME/git-innoaus/prebuilt_libs_macosx
+cmake .. -DBUILD_shared=ON -DCMAKE_CXX_FLAGS=-fPIC -DCMAKE_INSTALL_PREFIX=$HOME/git-innoaus/prebuilt_libs_macosx
+make -j8
+make install
+cmake .. -DBUILD_shared=OFF -DCMAKE_CXX_FLAGS=-fPIC -DCMAKE_INSTALL_PREFIX=$HOME/git-innoaus/prebuilt_libs_macosx
 make -j8
 make install
 
 cd $BUILD_ROOT
+
+#git clone https://github.com/zeroc-ice/ice.git
+
