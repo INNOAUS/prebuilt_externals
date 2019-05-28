@@ -63,18 +63,32 @@ BUILD_ROOT=$PWD
 
 #cd $BUILD_ROOT
 
-cd libexpat 
-tar xvfz R_2_2_6.tar.gz
-cd libexpat-R_2_2_6/expat
-mkdir build && cd build
-cmake .. -DBUILD_shared=ON -DCMAKE_CXX_FLAGS=-fPIC -DCMAKE_INSTALL_PREFIX=$HOME/git-innoaus/prebuilt_libs_macosx
-make -j8
-make install
-cmake .. -DBUILD_shared=OFF -DCMAKE_CXX_FLAGS=-fPIC -DCMAKE_INSTALL_PREFIX=$HOME/git-innoaus/prebuilt_libs_macosx
-make -j8
-make install
+#cd libexpat 
+#tar xvfz R_2_2_6.tar.gz
+#cd libexpat-R_2_2_6/expat
+#mkdir build && cd build
+#cmake .. -DBUILD_shared=ON -DCMAKE_CXX_FLAGS=-fPIC -DCMAKE_INSTALL_PREFIX=$HOME/git-innoaus/prebuilt_libs_macosx
+#make -j8
+#make install
+#cmake .. -DBUILD_shared=OFF -DCMAKE_CXX_FLAGS=-fPIC -DCMAKE_INSTALL_PREFIX=$HOME/git-innoaus/prebuilt_libs_macosx
+#make -j8
+#make install
+
+#cd $BUILD_ROOT
+
+cd zeroc-ice
+tar xvfz v3.7.2.tar.gz
+export BZ2_HOME=$HOME/git-innoaus/prebuilt_libs_macosx
+export EXPAT_HOME=$BZ2_HOME
+export MCPP_HOME=$BZ2_HOME
+cd ice-3.7.2/cpp
+make CONFIGS=cpp11-static -j8 CXXFLAGS="-std=c++11 -fPIC" LDFLAGS="-L$HOME/git-innoaus/prebuilt_libs_macosx/lib"
+make install CONFIGS=cpp11-static -j8 CXXFLAGS="-std=c++11 -fPIC" prefix=$MCPP_HOME
+make CONFIGS=cpp11-shared -j8 CXXFLAGS="-std=c++11 -fPIC" LDFLAGS="-L$HOME/git-innoaus/prebuilt_libs_macosx/lib"
+make install CONFIGS=cpp11-shared -j8 CXXFLAGS="-std=c++11 -fPIC" prefix=$MCPP_HOME
+make CONFIGS=static -j8 CXXFLAGS="-fPIC" LDFLAGS="-L$HOME/git-innoaus/prebuilt_libs_macosx/lib"
+make install CONFIGS=static -j8 CXXFLAGS="-fPIC" prefix=$MCPP_HOME
+make CONFIGS=shared -j8 CXXFLAGS="-fPIC" LDFLAGS="-L$HOME/git-innoaus/prebuilt_libs_macosx/lib"
+make install CONFIGS=shared -j8 CXXFLAGS="-fPIC" prefix=$MCPP_HOME
 
 cd $BUILD_ROOT
-
-#git clone https://github.com/zeroc-ice/ice.git
-
