@@ -25,10 +25,10 @@ else()
   endif()
 endif()
 
-# runtime-link=static
+# runtime-link=shared
 
-if(NOT Boost_USE_STATIC_RUNTIME)
-  _BOOST_SKIPPED("libboost_prg_exec_monitor.a" "static runtime, Boost_USE_STATIC_RUNTIME not ON")
+if(Boost_USE_STATIC_RUNTIME)
+  _BOOST_SKIPPED("libboost_prg_exec_monitor.a" "shared runtime, Boost_USE_STATIC_RUNTIME=${Boost_USE_STATIC_RUNTIME}")
   return()
 endif()
 
