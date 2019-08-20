@@ -1,0 +1,51 @@
+There are at least three programs I know of that list device mount points:
+
+mount - mount a filesystem (used for general mount info too):
+$ mount
+/dev/sda3 on / type ext4 (rw,errors=remount-ro)
+proc on /proc type proc (rw,noexec,nosuid,nodev)
+sysfs on /sys type sysfs (rw,noexec,nosuid,nodev)
+...
+/dev/mapper/lvmg-homelvm on /home type btrfs (rw,relatime,compress=lzo,space_cache)
+/dev/sda5 on /home/muru/arch type btrfs (rw,relatime,compress=lzo,space_cache)
+binfmt_misc on /proc/sys/fs/binfmt_misc type binfmt_misc (rw,noexec,nosuid,nodev)
+systemd on /sys/fs/cgroup/systemd type cgroup (rw,noexec,nosuid,nodev,none,name=systemd)
+df - report file system disk space usage
+$ df       
+Filesystem                1K-blocks      Used Available Use% Mounted on
+/dev/sda3                  30832636  11993480  17249912  42% /
+none                              4         0         4   0% /sys/fs/cgroup
+...
+/dev/sda5                  31457280   3948600  25396496  14% /home/bro3886/arch
+lsblk - list block devices
+$ lsblk
+NAME                    MAJ:MIN RM   SIZE RO TYPE MOUNTPOINT
+sda                       8:0    0 465.8G  0 disk 
+├─sda1                    8:1    0   100M  0 part 
+├─sda2                    8:2    0  58.5G  0 part 
+├─sda3                    8:3    0    30G  0 part /
+├─sda4                    8:4    0     1K  0 part 
+├─sda5                    8:5    0    30G  0 part 
+├─sda6                    8:6    0 339.2G  0 part 
+│ └─lvmg-homelvm (dm-0) 252:0    0   1.2T  0 lvm  
+└─sda7                    8:7    0     8G  0 part [SWAP]
+sdb                       8:16   0 931.5G  0 disk 
+└─sdb1                    8:17   0 931.5G  0 part 
+  └─lvmg-homelvm (dm-0) 252:0    0   1.2T  0 lvm  
+Of these three, mount lists all the mountpoints, AFAICT. The others have their weaknesses.
+
+findmnt suggested by @webwurst is now my favourite tool for the job. It's a Swiss Army knife when it comes to output control (newer versions can output in JSON too):
+$ findmnt /
+TARGET SOURCE    FSTYPE OPTIONS
+/      /dev/sda1 ext4   rw,relatime,errors=remount-ro,data=ordered
+$ findmnt / -no source
+/dev/sda1
+$ findmnt / --json
+{
+   "filesystems": [
+      {"target": "/", "source": "/dev/sda1", "fstype": "ext4", "options": "rw,relatime,errors=remount-ro,data=ordered"}
+   ]
+}
+$ findmnt / --df
+SOURCE    FSTYPE  SIZE  USED AVAIL USE% TARGET
+/dev/sda1 ext4   40.2G 25.8G 12.5G  64% /
