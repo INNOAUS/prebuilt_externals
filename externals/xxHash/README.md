@@ -16,7 +16,7 @@ Code is highly portable, and hashes are identical on all platforms (little / big
 Benchmarks
 -------------------------
 
-The benchmark uses SMHasher speed test, compiled with Visual 2010 on a Windows Seven 32-bits box.
+The benchmark uses SMHasher speed test, compiled with Visual 2010 on a Windows Seven 32-bit box.
 The reference system uses a Core 2 Duo @3GHz
 
 
@@ -39,20 +39,20 @@ It depends on successfully passing SMHasher test set.
 10 is a perfect score.
 Algorithms with a score < 5 are not listed on this table.
 
-A new version, XXH64, has been created thanks to [Mathias Westerdahl]'s contribution,
-which offers superior speed and dispersion for 64-bits systems.
-Note however that 32-bits applications will still run faster using the 32-bits version.
-[Mathias Westerdahl]: https://github.com/JCash
+A more recent version, XXH64, has been created thanks to [Mathias Westerdahl](https://github.com/JCash),
+which offers superior speed and dispersion for 64-bit systems.
+Note however that 32-bit applications will still run faster using the 32-bit version.
 
-SMHasher speed test, compiled using GCC 4.8.2, on Linux Mint 64-bits.
+SMHasher speed test, compiled using GCC 4.8.2, on Linux Mint 64-bit.
 The reference system uses a Core i5-3340M @2.7GHz
 
-| Version    | Speed on 64-bits | Speed on 32-bits |
+| Version    | Speed on 64-bit | Speed on 32-bit |
 |------------|------------------|------------------|
 | XXH64      | 13.8 GB/s        |  1.9 GB/s        |
 | XXH32      |  6.8 GB/s        |  6.0 GB/s        |
 
-This project also includes a command line utility, named `xxhsum`, offering similar features as `md5sum`, thanks to [Takayuki Matsuoka](https://github.com/t-mat) contributions.
+This project also includes a command line utility, named `xxhsum`, offering similar features as `md5sum`,
+thanks to [Takayuki Matsuoka](https://github.com/t-mat) contributions.
 
 
 ### License
@@ -63,27 +63,118 @@ The utility `xxhsum` is GPL licensed.
 
 ### Build modifiers
 
-The following macros influence xxhash behavior. They are all disabled by default.
+The following macros can be set at compilation time,
+they modify libxxhash behavior. They are all disabled by default.
 
-- `XXH_FORCE_NATIVE_FORMAT` : on big-endian systems : use native number representation,
-                              resulting in system-specific results.
-                              Breaks consistency with little-endian results.
-- `XXH_ACCEPT_NULL_INPUT_POINTER` : if presented with a null-pointer,
-                              xxhash result is the same as a null-length key,
-                              instead of a dereference segfault.
+- `XXH_INLINE_ALL` : Make all functions `inline`, with bodies directly included within `xxhash.h`.
+                     Inlining functions is beneficial for speed on small keys.
+                     It's _extremely effective_ when key length is expressed as _a compile time constant_,
+                     with performance improvements observed in the +200% range .
+                     See [this article](https://fastcompression.blogspot.com/2018/03/xxhash-for-small-keys-impressive-power.html) for details.
+                     Note: there is no need for an `xxhash.o` object file in this case.
+- `XXH_REROLL` : reduce size of generated code. Impact on performance vary, depending on platform and algorithm.
+- `XXH_ACCEPT_NULL_INPUT_POINTER` : if set to `1`, when input is a `NULL` pointer,
+                                    xxhash result is the same as a zero-length input
+                                    (instead of a dereference segfault).
+                                    Adds one branch at the beginning of the hash.
+- `XXH_FORCE_MEMORY_ACCESS` : default method `0` uses a portable `memcpy()` notation.
+                              Method `1` uses a gcc-specific `packed` attribute, which can provide better performance for some targets.
+                              Method `2` forces unaligned reads, which is not standard compliant, but might sometimes be the only way to extract better read performance.
+- `XXH_CPU_LITTLE_ENDIAN` : by default, endianess is determined at compile time.
+                            It's possible to skip auto-detection and force format to little-endian, by setting this macro to 1.
+                            Setting it to 0 forces big-endian.
+- `XXH_PRIVATE_API` : same impact as `XXH_INLINE_ALL`.
+                      Name underlines that XXH_* symbols will not be published.
+- `XXH_NAMESPACE` : prefix all symbols with the value of `XXH_NAMESPACE`.
+                    Useful to evade symbol naming collisions,
+                    in case of multiple inclusions of xxHash source code.
+                    Client applications can still use regular function name,
+                    symbols are automatically translated through `xxhash.h`.
+- `XXH_STATIC_LINKING_ONLY` : gives access to state declaration for static allocation.
+                              Incompatible with dynamic linking, due to risks of ABI changes.
 - `XXH_NO_LONG_LONG` : removes support for XXH64,
-                       useful for targets without 64-bits support.
-- `XXH_STATIC_LINKING_ONLY` : gives access to state definition for static allocation.
-                      Incompatible with dynamic linking, due to risks of ABI changes.
-- `XXH_PRIVATE_API` : Make all functions `static` and accessible through `xxhash.h` for inlining.
-                      Do not compile `xxhash.c` as a separate module in this case.
-- `XXH_NAMESPACE` : prefix all symbols with the value of `XXH_NAMESPACE`,
-                    in order to evade symbol naming collisions,
-                    in case of multiple inclusions of xxHash library
-                    (typically via intermediate libraries).
+                       for targets without 64-bit support.
+- `XXH_IMPORT` : MSVC specific : should only be defined for dynamic linking, it prevents linkage errors.
 
 
-### Other languages
+### Example
+
+Calling xxhash 64-bit variant from a C program :
+
+```C
+#include "xxhash.h"
+
+unsigned long long calcul_hash(const void* buffer, size_t length)
+{
+    unsigned long long const seed = 0;   /* or any other value */
+    unsigned long long const hash = XXH64(buffer, length, seed);
+    return hash;
+}
+```
+
+Using streaming variant is more involved, but makes it possible to provide data in multiple rounds :
+```C
+#include "stdlib.h"   /* abort() */
+#include "xxhash.h"
+
+
+unsigned long long calcul_hash_streaming(someCustomType handler)
+{
+    /* create a hash state */
+    XXH64_state_t* const state = XXH64_createState();
+    if (state==NULL) abort();
+
+    size_t const bufferSize = SOME_SIZE;
+    void* const buffer = malloc(bufferSize);
+    if (buffer==NULL) abort();
+
+    /* Initialize state with selected seed */
+    unsigned long long const seed = 0;   /* or any other value */
+    XXH_errorcode const resetResult = XXH64_reset(state, seed);
+    if (resetResult == XXH_ERROR) abort();
+
+    /* Feed the state with input data, any size, any number of times */
+    (...)
+    while ( /* any condition */ ) {
+        size_t const length = get_more_data(buffer, bufferSize, handler);   
+        XXH_errorcode const updateResult = XXH64_update(state, buffer, length);
+        if (updateResult == XXH_ERROR) abort();
+        (...)
+    }
+    (...)
+
+    /* Get the hash */
+    XXH64_hash_t const hash = XXH64_digest(state);
+
+    /* State can then be re-used; in this example, it is simply freed  */
+    free(buffer);
+    XXH64_freeState(state);
+
+    return (unsigned long long)hash;
+}
+```
+
+### New experimental hash algorithm
+
+Starting with `v0.7.0`, the library includes a new algorithm, named `XXH3`,
+able to generate 64 and 128-bits hashes.
+
+The new algorithm is much faster than its predecessors,
+for both long and small inputs,
+as can be observed in following graphs :
+
+![XXH3, bargraph](https://user-images.githubusercontent.com/750081/61976096-b3a35f00-af9f-11e9-8229-e0afc506c6ec.png)
+
+![XXH3, latency, random size](https://user-images.githubusercontent.com/750081/61976089-aedeab00-af9f-11e9-9239-e5375d6c080f.png)
+
+The algorithm is currently labelled experimental, its return values can still change in a future version.
+It can be used for ephemeral data, and for tests, but avoid storing long-term hash values yet.
+To access it, one need to unlock its declaration using macro `XXH_STATIC_LINKING_ONLY`.
+`XXH3` will be stabilized in a future version.
+This period is used to collect users' feedback.
+
+
+### Other programming languages
 
 Beyond the C reference version,
 xxHash is also available on many programming languages,
