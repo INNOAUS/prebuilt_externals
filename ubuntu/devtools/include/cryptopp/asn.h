@@ -201,6 +201,19 @@ public:
 	/// </pre>
 	void BERDecodeAndCheck(BufferedTransformation &bt) const;
 
+	bool Empty() const {
+		return m_values.empty();
+	}
+
+	const std::vector<word32>& GetValues() const {
+		return m_values;
+	}
+
+protected:
+	friend bool operator==(const OID &lhs, const OID &rhs);
+	friend bool operator!=(const OID &lhs, const OID &rhs);
+	friend bool operator<(const OID &lhs, const OID &rhs);
+
 	std::vector<word32> m_values;
 
 private:
@@ -213,6 +226,7 @@ class EncodedObjectFilter : public Filter
 {
 public:
 	enum Flag {PUT_OBJECTS=1, PUT_MESSANGE_END_AFTER_EACH_OBJECT=2, PUT_MESSANGE_END_AFTER_ALL_OBJECTS=4, PUT_MESSANGE_SERIES_END_AFTER_ALL_OBJECTS=8};
+	enum State {IDENTIFIER, LENGTH, BODY, TAIL, ALL_DONE} m_state;
 
 	virtual ~EncodedObjectFilter() {}
 
@@ -233,40 +247,116 @@ public:
 private:
 	BufferedTransformation & CurrentTarget();
 
-	word32 m_flags;
-	unsigned int m_nObjects, m_nCurrentObject, m_level;
-	std::vector<unsigned int> m_positions;
 	ByteQueue m_queue;
-	enum State {IDENTIFIER, LENGTH, BODY, TAIL, ALL_DONE} m_state;
-	byte m_id;
+	std::vector<unsigned int> m_positions;
 	lword m_lengthRemaining;
+	word32 m_nObjects, m_nCurrentObject, m_level, m_flags;
+	byte m_id;
 };
 
 /// \brief BER General Decoder
 class CRYPTOPP_DLL BERGeneralDecoder : public Store
 {
 public:
+	/// \brief Default ASN.1 tag
+	enum {DefaultTag = SEQUENCE | CONSTRUCTED};
+
 	virtual ~BERGeneralDecoder();
 
+	/// \brief Construct an ASN.1 decoder
+	/// \param inQueue input byte queue
+	/// \details BERGeneralDecoder uses DefaultTag
+	explicit BERGeneralDecoder(BufferedTransformation &inQueue);
+
+	/// \brief Construct an ASN.1 decoder
+	/// \param inQueue input byte queue
+	/// \param asnTag ASN.1 tag
 	explicit BERGeneralDecoder(BufferedTransformation &inQueue, byte asnTag);
+
+	/// \brief Construct an ASN.1 decoder
+	/// \param inQueue input byte queue
+	/// \param asnTag ASN.1 tag
 	explicit BERGeneralDecoder(BERGeneralDecoder &inQueue, byte asnTag);
 
-	bool IsDefiniteLength() const {return m_definiteLength;}
-	lword RemainingLength() const {CRYPTOPP_ASSERT(m_definiteLength); return m_length;}
+	/// \brief Determine length encoding
+	/// \returns true if the ASN.1 object is definite length encoded, false otherwise
+	bool IsDefiniteLength() const {
+		return m_definiteLength;
+	}
+
+	/// \brief Determine remaining length
+	/// \returns number of octets that remain to be consumed
+	/// \details RemainingLength() is only valid if IsDefiniteLength()
+	///  returns true.
+	lword RemainingLength() const {
+		CRYPTOPP_ASSERT(m_definiteLength);
+		return IsDefiniteLength() ? m_length : 0;
+	}
+
+	/// \brief Determine end of stream
+	/// \returns true if all octets have been consumed, false otherwise
 	bool EndReached() const;
+
+	/// \brief Determine next octet
+	/// \returns next octet in the stream
+	/// \details PeekByte does not consume the octet.
+	/// \throws BERDecodeError if there are no octets remaining
 	byte PeekByte() const;
+
+	/// \brief Determine next octet
+	/// \details CheckByte reads the next byte in the stream and verifies
+	///  the octet matches b.
+	/// \throws BERDecodeError if the next octet is not b
 	void CheckByte(byte b);
 
+	/// \brief Transfer bytes to another BufferedTransformation
+	/// \param target the destination BufferedTransformation
+	/// \param transferBytes the number of bytes to transfer
+	/// \param channel the channel on which the transfer should occur
+	/// \param blocking specifies whether the object should block when
+	///  processing input
+	/// \return the number of bytes that remain in the transfer block
+	///  (i.e., bytes not transferred)
+	/// \details TransferTo2() removes bytes and moves
+	///  them to the destination. Transfer begins at the index position
+	///  in the current stream, and not from an absolute position in the
+	///  stream.
+	/// \details transferBytes is an \a IN and \a OUT parameter. When
+	///  the call is made, transferBytes is the requested size of the
+	///  transfer. When the call returns, transferBytes is the number
+	///  of bytes that were transferred.
 	size_t TransferTo2(BufferedTransformation &target, lword &transferBytes, const std::string &channel=DEFAULT_CHANNEL, bool blocking=true);
+
+	/// \brief Copy bytes to another BufferedTransformation
+	/// \param target the destination BufferedTransformation
+	/// \param begin the 0-based index of the first byte to copy in
+	///  the stream
+	/// \param end the 0-based index of the last byte to copy in
+	///  the stream
+	/// \param channel the channel on which the transfer should occur
+	/// \param blocking specifies whether the object should block when
+	///  processing input
+	/// \return the number of bytes that remain in the copy block
+	///  (i.e., bytes not copied)
+	/// \details CopyRangeTo2 copies bytes to the
+	///  destination. The bytes are not removed from this object. Copying
+	///  begins at the index position in the current stream, and not from
+	///  an absolute position in the stream.
+	/// \details begin is an \a IN and \a OUT parameter. When the call is
+	///  made, begin is the starting position of the copy. When the call
+	///  returns, begin is the position of the first byte that was \a not
+	///  copied (which may be different than end). begin can be used for
+	///  subsequent calls to CopyRangeTo2().
 	size_t CopyRangeTo2(BufferedTransformation &target, lword &begin, lword end=LWORD_MAX, const std::string &channel=DEFAULT_CHANNEL, bool blocking=true) const;
 
-	// call this to denote end of sequence
+	/// \brief Signals the end of messages to the object
+	/// \details Call this to denote end of sequence
 	void MessageEnd();
 
 protected:
 	BufferedTransformation &m_inQueue;
-	bool m_finished, m_definiteLength;
 	lword m_length;
+	bool m_finished, m_definiteLength;
 
 private:
 	void Init(byte asnTag);
@@ -275,37 +365,69 @@ private:
 	lword ReduceLength(lword delta);
 };
 
-// GCC (and likely other compilers) identify the explicit DERGeneralEncoder as a copy constructor;
-// and not a constructor. We had to remove the default asnTag value to point the compiler in the
-// proper direction. We did not break the library or versioning based on the output of
-// `nm --demangle libcryptopp.a | grep DERGeneralEncoder::DERGeneralEncoder | grep -v " U "`.
-
 /// \brief DER General Encoder
 class CRYPTOPP_DLL DERGeneralEncoder : public ByteQueue
 {
 public:
+	/// \brief Default ASN.1 tag
+	enum {DefaultTag = SEQUENCE | CONSTRUCTED};
+
 	virtual ~DERGeneralEncoder();
 
-	explicit DERGeneralEncoder(BufferedTransformation &outQueue, byte asnTag = SEQUENCE | CONSTRUCTED);
-	explicit DERGeneralEncoder(DERGeneralEncoder &outQueue, byte asnTag = SEQUENCE | CONSTRUCTED);
+	/// \brief Construct an ASN.1 encoder
+	/// \param outQueue output byte queue
+	/// \details DERGeneralEncoder uses DefaultTag
+	explicit DERGeneralEncoder(BufferedTransformation &outQueue);
 
-	// call this to denote end of sequence
+	/// \brief Construct an ASN.1 encoder
+	/// \param outQueue output byte queue
+	/// \param asnTag ASN.1 tag
+	explicit DERGeneralEncoder(BufferedTransformation &outQueue, byte asnTag);
+
+	/// \brief Construct an ASN.1 encoder
+	/// \param outQueue output byte queue
+	/// \param asnTag ASN.1 tag
+	explicit DERGeneralEncoder(DERGeneralEncoder &outQueue, byte asnTag);
+
+	/// \brief Signals the end of messages to the object
+	/// \details Call this to denote end of sequence
 	void MessageEnd();
 
 private:
 	BufferedTransformation &m_outQueue;
-	bool m_finished;
-
 	byte m_asnTag;
+	bool m_finished;
 };
 
 /// \brief BER Sequence Decoder
 class CRYPTOPP_DLL BERSequenceDecoder : public BERGeneralDecoder
 {
 public:
-	explicit BERSequenceDecoder(BufferedTransformation &inQueue, byte asnTag = SEQUENCE | CONSTRUCTED)
+	/// \brief Default ASN.1 tag
+	enum {DefaultTag = SEQUENCE | CONSTRUCTED};
+
+	/// \brief Construct an ASN.1 decoder
+	/// \param inQueue input byte queue
+	/// \details BERSequenceDecoder uses DefaultTag
+	explicit BERSequenceDecoder(BufferedTransformation &inQueue)
+		: BERGeneralDecoder(inQueue, DefaultTag) {}
+
+	/// \brief Construct an ASN.1 decoder
+	/// \param inQueue input byte queue
+	/// \param asnTag ASN.1 tag
+	explicit BERSequenceDecoder(BufferedTransformation &inQueue, byte asnTag)
 		: BERGeneralDecoder(inQueue, asnTag) {}
-	explicit BERSequenceDecoder(BERSequenceDecoder &inQueue, byte asnTag = SEQUENCE | CONSTRUCTED)
+
+	/// \brief Construct an ASN.1 decoder
+	/// \param inQueue input byte queue
+	/// \details BERSequenceDecoder uses DefaultTag
+	explicit BERSequenceDecoder(BERSequenceDecoder &inQueue)
+		: BERGeneralDecoder(inQueue, DefaultTag) {}
+
+	/// \brief Construct an ASN.1 decoder
+	/// \param inQueue input byte queue
+	/// \param asnTag ASN.1 tag
+	explicit BERSequenceDecoder(BERSequenceDecoder &inQueue, byte asnTag)
 		: BERGeneralDecoder(inQueue, asnTag) {}
 };
 
@@ -313,9 +435,31 @@ public:
 class CRYPTOPP_DLL DERSequenceEncoder : public DERGeneralEncoder
 {
 public:
-	explicit DERSequenceEncoder(BufferedTransformation &outQueue, byte asnTag = SEQUENCE | CONSTRUCTED)
+	/// \brief Default ASN.1 tag
+	enum {DefaultTag = SEQUENCE | CONSTRUCTED};
+
+	/// \brief Construct an ASN.1 encoder
+	/// \param outQueue output byte queue
+	/// \details DERSequenceEncoder uses DefaultTag
+	explicit DERSequenceEncoder(BufferedTransformation &outQueue)
+		: DERGeneralEncoder(outQueue, DefaultTag) {}
+
+	/// \brief Construct an ASN.1 encoder
+	/// \param outQueue output byte queue
+	/// \param asnTag ASN.1 tag
+	explicit DERSequenceEncoder(BufferedTransformation &outQueue, byte asnTag)
 		: DERGeneralEncoder(outQueue, asnTag) {}
-	explicit DERSequenceEncoder(DERSequenceEncoder &outQueue, byte asnTag = SEQUENCE | CONSTRUCTED)
+
+	/// \brief Construct an ASN.1 encoder
+	/// \param outQueue output byte queue
+	/// \details DERSequenceEncoder uses DefaultTag
+	explicit DERSequenceEncoder(DERSequenceEncoder &outQueue)
+		: DERGeneralEncoder(outQueue, DefaultTag) {}
+
+	/// \brief Construct an ASN.1 encoder
+	/// \param outQueue output byte queue
+	/// \param asnTag ASN.1 tag
+	explicit DERSequenceEncoder(DERSequenceEncoder &outQueue, byte asnTag)
 		: DERGeneralEncoder(outQueue, asnTag) {}
 };
 
@@ -323,9 +467,31 @@ public:
 class CRYPTOPP_DLL BERSetDecoder : public BERGeneralDecoder
 {
 public:
-	explicit BERSetDecoder(BufferedTransformation &inQueue, byte asnTag = SET | CONSTRUCTED)
+	/// \brief Default ASN.1 tag
+	enum {DefaultTag = SET | CONSTRUCTED};
+
+	/// \brief Construct an ASN.1 decoder
+	/// \param inQueue input byte queue
+	/// \details BERSetDecoder uses DefaultTag
+	explicit BERSetDecoder(BufferedTransformation &inQueue)
+		: BERGeneralDecoder(inQueue, DefaultTag) {}
+
+	/// \brief Construct an ASN.1 decoder
+	/// \param inQueue input byte queue
+	/// \param asnTag ASN.1 tag
+	explicit BERSetDecoder(BufferedTransformation &inQueue, byte asnTag)
 		: BERGeneralDecoder(inQueue, asnTag) {}
-	explicit BERSetDecoder(BERSetDecoder &inQueue, byte asnTag = SET | CONSTRUCTED)
+
+	/// \brief Construct an ASN.1 decoder
+	/// \param inQueue input byte queue
+	/// \details BERSetDecoder uses DefaultTag
+	explicit BERSetDecoder(BERSetDecoder &inQueue)
+		: BERGeneralDecoder(inQueue, DefaultTag) {}
+
+	/// \brief Construct an ASN.1 decoder
+	/// \param inQueue input byte queue
+	/// \param asnTag ASN.1 tag
+	explicit BERSetDecoder(BERSetDecoder &inQueue, byte asnTag)
 		: BERGeneralDecoder(inQueue, asnTag) {}
 };
 
@@ -333,9 +499,31 @@ public:
 class CRYPTOPP_DLL DERSetEncoder : public DERGeneralEncoder
 {
 public:
-	explicit DERSetEncoder(BufferedTransformation &outQueue, byte asnTag = SET | CONSTRUCTED)
+	/// \brief Default ASN.1 tag
+	enum {DefaultTag = SET | CONSTRUCTED};
+
+	/// \brief Construct an ASN.1 encoder
+	/// \param outQueue output byte queue
+	/// \details DERSetEncoder uses DefaultTag
+	explicit DERSetEncoder(BufferedTransformation &outQueue)
+		: DERGeneralEncoder(outQueue, DefaultTag) {}
+
+	/// \brief Construct an ASN.1 encoder
+	/// \param outQueue output byte queue
+	/// \param asnTag ASN.1 tag
+	explicit DERSetEncoder(BufferedTransformation &outQueue, byte asnTag)
 		: DERGeneralEncoder(outQueue, asnTag) {}
-	explicit DERSetEncoder(DERSetEncoder &outQueue, byte asnTag = SET | CONSTRUCTED)
+
+	/// \brief Construct an ASN.1 encoder
+	/// \param outQueue output byte queue
+	/// \details DERSetEncoder uses DefaultTag
+	explicit DERSetEncoder(DERSetEncoder &outQueue)
+		: DERGeneralEncoder(outQueue, DefaultTag) {}
+
+	/// \brief Construct an ASN.1 encoder
+	/// \param outQueue output byte queue
+	/// \param asnTag ASN.1 tag
+	explicit DERSetEncoder(DERSetEncoder &outQueue, byte asnTag)
 		: DERGeneralEncoder(outQueue, asnTag) {}
 };
 
@@ -411,7 +599,7 @@ public:
 	virtual void DEREncodePublicKey(BufferedTransformation &bt) const =0;
 };
 
-/// \brief Encodes and decodesprivateKeyInfo
+/// \brief Encodes and Decodes privateKeyInfo
 class CRYPTOPP_DLL PKCS8PrivateKey : public ASN1CryptoMaterial<PrivateKey>
 {
 public:

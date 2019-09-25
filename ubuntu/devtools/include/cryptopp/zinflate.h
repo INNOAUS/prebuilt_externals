@@ -1,3 +1,8 @@
+// zinflate.h - originally written and placed in the public domain by Wei Dai
+
+/// \file zinflate.h
+/// \brief DEFLATE compression and decompression (RFC 1951)
+
 #ifndef CRYPTOPP_ZINFLATE_H
 #define CRYPTOPP_ZINFLATE_H
 
@@ -133,11 +138,11 @@ private:
 	void OutputString(const byte *string, size_t length);
 	void OutputPast(unsigned int length, unsigned int distance);
 
-	static const HuffmanDecoder *FixedLiteralDecoder();
-	static const HuffmanDecoder *FixedDistanceDecoder();
+	void CreateFixedDistanceDecoder();
+	void CreateFixedLiteralDecoder();
 
-	const HuffmanDecoder& GetLiteralDecoder() const;
-	const HuffmanDecoder& GetDistanceDecoder() const;
+	const HuffmanDecoder& GetLiteralDecoder();
+	const HuffmanDecoder& GetDistanceDecoder();
 
 	enum State {PRE_STREAM, WAIT_HEADER, DECODING_BODY, POST_STREAM, AFTER_END};
 	State m_state;
@@ -148,6 +153,7 @@ private:
 	NextDecode m_nextDecode;
 	unsigned int m_literal, m_distance;	// for LENGTH_BITS or DISTANCE_BITS
 	HuffmanDecoder m_dynamicLiteralDecoder, m_dynamicDistanceDecoder;
+	member_ptr<HuffmanDecoder> m_fixedLiteralDecoder, m_fixedDistanceDecoder;
 	LowFirstBitReader m_reader;
 	SecByteBlock m_window;
 	size_t m_current, m_lastFlush;
