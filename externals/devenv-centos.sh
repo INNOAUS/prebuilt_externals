@@ -39,7 +39,8 @@ cd ../..
 cd xxHash/cmake_unofficial
 mkdir build
 cd build
-cmake .. -DCMAKE_INSTALL_PREFIX=../../../devtools -DBUILD_SHARED_LIBS=OFF -DBUILD_STATIC_LIBS=ON
+cmake .. -DCMAKE_INSTALL_PREFIX=../../../../ubuntu/devtools -DBUILD_SHARED_LIBS=OFF
+#cmake .. -DCMAKE_INSTALL_PREFIX=../../../devtools -DBUILD_SHARED_LIBS=OFF -DBUILD_STATIC_LIBS=ON
 make
 make install
 cd ../../..
