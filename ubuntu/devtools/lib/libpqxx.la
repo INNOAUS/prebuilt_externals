@@ -17,7 +17,7 @@ old_library='libpqxx.a'
 inherited_linker_flags=''
 
 # Libraries that this one depends upon.
-dependency_libs=' -L/home/leo/git-innoaus/prebuilt_externals/ubuntu/devtools/bdr/lib -lpq'
+dependency_libs=' -L/home/leo/2ndquadrant_bdr/bdr/lib -lpq'
 
 # Names of additional weak libraries provided by this library
 weak_library_names=''

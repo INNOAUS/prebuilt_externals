@@ -1,11 +1,11 @@
 prefix=/home/leo/git-innoaus/prebuilt_externals/ubuntu/devtools
 exec_prefix=/home/leo/git-innoaus/prebuilt_externals/ubuntu/devtools
-libdir=/home/leo/git-innoaus/prebuilt_externals/ubuntu/devtools/lib
-includedir=/home/leo/git-innoaus/prebuilt_externals/ubuntu/devtools/include
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
 
 Name: fmt
 Description: A modern formatting library
-Version: 5.3.1
+Version: 6.0.0
 Libs: -L${libdir} -lfmt
 Cflags: -I${includedir}
 
