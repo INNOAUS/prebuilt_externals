@@ -62,36 +62,66 @@
 #include <stdlib.h>
 #endif
 
-#if defined(__GNUC__) && defined(__linux__)
-#define CRYPTOPP_BYTESWAP_AVAILABLE
+#if (defined(__GNUC__) || defined(__clang__)) && defined(__linux__)
+#define CRYPTOPP_BYTESWAP_AVAILABLE 1
 #include <byteswap.h>
+#endif
+
+// Limit to ARM A-32. Aarch64 is failing self tests.
+#if defined(__arm__) && (defined(__GNUC__) || defined(__clang__)) && (__ARM_ARCH >= 6)
+#define CRYPTOPP_ARM_BYTEREV_AVAILABLE 1
+#endif
+
+// Limit to ARM A-32. Aarch64 is failing self tests.
+#if defined(__arm__) && (defined(__GNUC__) || defined(__clang__)) && (__ARM_ARCH >= 7)
+#define CRYPTOPP_ARM_BITREV_AVAILABLE 1
 #endif
 
 #if defined(__BMI__)
 # include <x86intrin.h>
+# include <immintrin.h>
 #endif  // GCC and BMI
+
+// More LLVM bullshit. Apple Clang 6.0 does not define them.
+// Later version of Clang defines them and results in warnings.
+#if defined(__clang__)
+# ifndef _blsr_u32
+#  define _blsr_u32 __blsr_u32
+# endif
+# ifndef _blsr_u64
+#  define _blsr_u64 __blsr_u64
+# endif
+# ifndef _tzcnt_u32
+#  define _tzcnt_u32 __tzcnt_u32
+# endif
+# ifndef _tzcnt_u64
+#  define _tzcnt_u64 __tzcnt_u64
+# endif
+#endif
 
 #endif  // CRYPTOPP_DOXYGEN_PROCESSING
 
 #if CRYPTOPP_DOXYGEN_PROCESSING
 /// \brief The maximum value of a machine word
-/// \details SIZE_MAX provides the maximum value of a machine word. The value is
-///   0xffffffff on 32-bit machines, and 0xffffffffffffffff on 64-bit machines.
-/// Internally, SIZE_MAX is defined as __SIZE_MAX__ if __SIZE_MAX__ is defined. If not
-///   defined, then SIZE_T_MAX is tried. If neither __SIZE_MAX__ nor SIZE_T_MAX is
-///   is defined, the library uses std::numeric_limits<size_t>::max(). The library
-///   prefers __SIZE_MAX__ because its a constexpr that is optimized well
-///   by all compilers. std::numeric_limits<size_t>::max() is not a constexpr,
-///   and it is not always optimized well.
+/// \details <tt>SIZE_MAX</tt> provides the maximum value of a machine word. The value
+///  is <tt>0xffffffff</tt> on 32-bit targets, and <tt>0xffffffffffffffff</tt> on 64-bit
+///  targets.
+/// \details If <tt>SIZE_MAX</tt> is not defined, then <tt>__SIZE_MAX__</tt> is used if
+///  defined. If not defined, then <tt>SIZE_T_MAX</tt> is used if defined. If not defined,
+///  then the library uses <tt>std::numeric_limits<size_t>::max()</tt>.
+/// \details The library prefers <tt>__SIZE_MAX__</tt> or <tt>__SIZE_T_MAX__</tt> because
+///  they are effectively <tt>constexpr</tt> that is optimized well by all compilers.
+///  <tt>std::numeric_limits<size_t>::max()</tt> is not always a <tt>constexpr</tt>, and
+///  it is not always optimized well.
 #  define SIZE_MAX ...
 #else
 // Its amazing portability problems still plague this simple concept in 2015.
-//   http://stackoverflow.com/questions/30472731/which-c-standard-header-defines-size-max
+// http://stackoverflow.com/questions/30472731/which-c-standard-header-defines-size-max
 // Avoid NOMINMAX macro on Windows. http://support.microsoft.com/en-us/kb/143208
 #ifndef SIZE_MAX
-# if defined(__SIZE_MAX__) && (__SIZE_MAX__ > 0)
+# if defined(__SIZE_MAX__)
 #  define SIZE_MAX __SIZE_MAX__
-# elif defined(SIZE_T_MAX) && (SIZE_T_MAX > 0)
+# elif defined(SIZE_T_MAX)
 #  define SIZE_MAX SIZE_T_MAX
 # elif defined(__SIZE_TYPE__)
 #  define SIZE_MAX (~(__SIZE_TYPE__)0)
@@ -112,8 +142,13 @@ class Integer;
 #if CRYPTOPP_DOXYGEN_PROCESSING
 /// \brief Compile time assertion
 /// \param expr the expression to evaluate
-/// \details Asserts the expression expr though a dummy struct.
-#define CRYPTOPP_COMPILE_ASSERT(expr) { ... }
+/// \details Asserts the expression <tt>expr</tt> during compile. If C++14 and
+///  N3928 are available, then C++14 <tt>static_assert</tt> is used. Otherwise,
+///  a <tt>CompileAssert</tt> structure is used. When the structure is used
+///  a negative-sized array triggers the assert at compile time.
+# define CRYPTOPP_COMPILE_ASSERT(expr) { ... }
+#elif defined(CRYPTOPP_CXX14_STATIC_ASSERT)
+# define CRYPTOPP_COMPILE_ASSERT(expr) static_assert(expr)
 #else // CRYPTOPP_DOXYGEN_PROCESSING
 template <bool b>
 struct CompileAssert
@@ -122,21 +157,22 @@ struct CompileAssert
 };
 
 #define CRYPTOPP_COMPILE_ASSERT(assertion) CRYPTOPP_COMPILE_ASSERT_INSTANCE(assertion, __LINE__)
-#if defined(CRYPTOPP_EXPORTS) || defined(CRYPTOPP_IMPORTS)
-#define CRYPTOPP_COMPILE_ASSERT_INSTANCE(assertion, instance)
-#else
-# if defined(__GNUC__)
-#  define CRYPTOPP_COMPILE_ASSERT_INSTANCE(assertion, instance) \
-		static CompileAssert<(assertion)> \
-		CRYPTOPP_ASSERT_JOIN(cryptopp_CRYPTOPP_ASSERT_, instance) __attribute__ ((unused))
-# else
-#  define CRYPTOPP_COMPILE_ASSERT_INSTANCE(assertion, instance) \
-		static CompileAssert<(assertion)> \
-		CRYPTOPP_ASSERT_JOIN(cryptopp_CRYPTOPP_ASSERT_, instance)
-# endif // __GNUC__
-#endif
 #define CRYPTOPP_ASSERT_JOIN(X, Y) CRYPTOPP_DO_ASSERT_JOIN(X, Y)
 #define CRYPTOPP_DO_ASSERT_JOIN(X, Y) X##Y
+
+#if defined(CRYPTOPP_EXPORTS) || defined(CRYPTOPP_IMPORTS)
+# define CRYPTOPP_COMPILE_ASSERT_INSTANCE(assertion, instance)
+#else
+# if defined(__GNUC__) || defined(__clang__)
+#  define CRYPTOPP_COMPILE_ASSERT_INSTANCE(assertion, instance) \
+       static CompileAssert<(assertion)> \
+       CRYPTOPP_ASSERT_JOIN(cryptopp_CRYPTOPP_ASSERT_, instance) __attribute__ ((unused))
+# else
+#  define CRYPTOPP_COMPILE_ASSERT_INSTANCE(assertion, instance) \
+       static CompileAssert<(assertion)> \
+       CRYPTOPP_ASSERT_JOIN(cryptopp_CRYPTOPP_ASSERT_, instance)
+# endif // GCC or Clang
+#endif
 
 #endif // CRYPTOPP_DOXYGEN_PROCESSING
 
@@ -194,16 +230,21 @@ protected:
 
 /// \brief Ensures an object is not copyable
 /// \details NotCopyable ensures an object is not copyable by making the
-///   copy constructor and assignment operator private. Deleters are not
-///   used under C++11.
+///   copy constructor and assignment operator private. Deleters are used
+///   under C++11.
 /// \sa Clonable class
 class NotCopyable
 {
 public:
 	NotCopyable() {}
+#if CRYPTOPP_CXX11_DELETED_FUNCTIONS
+	NotCopyable(const NotCopyable &) = delete;
+	void operator=(const NotCopyable &) = delete;
+#else
 private:
-    NotCopyable(const NotCopyable &);
-    void operator=(const NotCopyable &);
+	NotCopyable(const NotCopyable &);
+	void operator=(const NotCopyable &);
+#endif
 };
 
 /// \brief An object factory function
@@ -903,11 +944,12 @@ CRYPTOPP_DLL void CRYPTOPP_API xorbuf(byte *output, const byte *input, const byt
 /// \param buf1 the first buffer
 /// \param buf2 the second buffer
 /// \param count the size of the buffers, in bytes
-/// \details The function effectively performs an XOR of the elements in two equally sized
-///   buffers and retruns a result based on the XOR operation. The function is near
-///   constant-time because CPU micro-code timings could affect the "constant-ness".
-///   Calling code is responsible for mitigating timing attacks if the buffers are not
-///   equally sized.
+/// \details VerifyBufsEqual performs an XOR of the elements in two equally sized
+///   buffers and retruns a result based on the XOR operation. A count of 0 returns
+///   true because two empty buffers are considered equal.
+/// \details The function is near constant-time because CPU micro-code timings could
+///   affect the "constant-ness". Calling code is responsible for mitigating timing
+///   attacks if the buffers are not equally sized.
 /// \sa ModPowerOf2
 CRYPTOPP_DLL bool CRYPTOPP_API VerifyBufsEqual(const byte *buf1, const byte *buf2, size_t count);
 
@@ -1225,9 +1267,15 @@ CRYPTOPP_DLL void CRYPTOPP_API CallNewHandler();
 /// \note The function is not constant time because it stops processing when the carry is 0.
 inline void IncrementCounterByOne(byte *inout, unsigned int size)
 {
-	CRYPTOPP_ASSERT(inout != NULLPTR); CRYPTOPP_ASSERT(size < INT_MAX);
-	for (int i=int(size-1), carry=1; i>=0 && carry; i--)
-		carry = !++inout[i];
+	CRYPTOPP_ASSERT(inout != NULLPTR);
+
+	unsigned int carry=1;
+	while (carry && size != 0)
+	{
+		// On carry inout[n] equals 0
+		carry = ! ++inout[size-1];
+		size--;
+	}
 }
 
 /// \brief Performs an addition with carry on a block of bytes
@@ -1239,12 +1287,22 @@ inline void IncrementCounterByOne(byte *inout, unsigned int size)
 /// \details The function is close to near-constant time because it operates on all the bytes in the blocks.
 inline void IncrementCounterByOne(byte *output, const byte *input, unsigned int size)
 {
-	CRYPTOPP_ASSERT(output != NULLPTR); CRYPTOPP_ASSERT(input != NULLPTR); CRYPTOPP_ASSERT(size < INT_MAX);
+	CRYPTOPP_ASSERT(output != NULLPTR);
+	CRYPTOPP_ASSERT(input != NULLPTR);
 
-	int i, carry;
-	for (i=int(size-1), carry=1; i>=0 && carry; i--)
-		carry = ((output[i] = input[i]+1) == 0);
-	memcpy_s(output, size, input, size_t(i)+1);
+	unsigned int carry=1;
+	while (carry && size != 0)
+	{
+		// On carry output[n] equals 0
+		carry = ! (output[size-1] = input[size-1] + 1);
+		size--;
+	}
+
+	while (size != 0)
+	{
+		output[size-1] = input[size-1];
+		size--;
+	}
 }
 
 /// \brief Performs a branchless swap of values a and b if condition c is true
@@ -1968,7 +2026,8 @@ inline unsigned int GetByte(ByteOrder order, T value, unsigned int index)
 
 /// \brief Reverses bytes in a 8-bit value
 /// \param value the 8-bit value to reverse
-/// \note ByteReverse returns the value passed to it since there is nothing to reverse
+/// \note ByteReverse returns the value passed to it since there is nothing to
+///  reverse.
 inline byte ByteReverse(byte value)
 {
 	return value;
@@ -1976,7 +2035,8 @@ inline byte ByteReverse(byte value)
 
 /// \brief Reverses bytes in a 16-bit value
 /// \param value the 16-bit value to reverse
-/// \details ByteReverse calls bswap if available. Otherwise the function performs a 8-bit rotate on the word16
+/// \details ByteReverse calls bswap if available. Otherwise the function
+///  performs a 8-bit rotate on the word16.
 inline word16 ByteReverse(word16 value)
 {
 #if defined(CRYPTOPP_BYTESWAP_AVAILABLE)
@@ -1990,14 +2050,19 @@ inline word16 ByteReverse(word16 value)
 
 /// \brief Reverses bytes in a 32-bit value
 /// \param value the 32-bit value to reverse
-/// \details ByteReverse calls bswap if available. Otherwise the function uses a combination of rotates on the word32
+/// \details ByteReverse calls bswap if available. Otherwise the function uses
+///  a combination of rotates on the word32.
 inline word32 ByteReverse(word32 value)
 {
-#if defined(__GNUC__) && defined(CRYPTOPP_X86_ASM_AVAILABLE)
+#if defined(CRYPTOPP_BYTESWAP_AVAILABLE)
+	return bswap_32(value);
+#elif defined(CRYPTOPP_ARM_BYTEREV_AVAILABLE)
+	word32 rvalue;
+	__asm__ ("rev %0, %1" : "=r" (rvalue) : "r" (value));
+	return rvalue;
+#elif defined(__GNUC__) && defined(CRYPTOPP_X86_ASM_AVAILABLE)
 	__asm__ ("bswap %0" : "=r" (value) : "0" (value));
 	return value;
-#elif defined(CRYPTOPP_BYTESWAP_AVAILABLE)
-	return bswap_32(value);
 #elif defined(__MWERKS__) && TARGET_CPU_PPC
 	return (word32)__lwbrx(&value,0);
 #elif (_MSC_VER >= 1400) || (defined(_MSC_VER) && !defined(_DLL))
@@ -2014,14 +2079,15 @@ inline word32 ByteReverse(word32 value)
 
 /// \brief Reverses bytes in a 64-bit value
 /// \param value the 64-bit value to reverse
-/// \details ByteReverse calls bswap if available. Otherwise the function uses a combination of rotates on the word64
+/// \details ByteReverse calls bswap if available. Otherwise the function uses
+///  a combination of rotates on the word64.
 inline word64 ByteReverse(word64 value)
 {
-#if defined(__GNUC__) && defined(CRYPTOPP_X86_ASM_AVAILABLE) && defined(__x86_64__)
+#if defined(CRYPTOPP_BYTESWAP_AVAILABLE)
+	return bswap_64(value);
+#elif defined(__GNUC__) && defined(CRYPTOPP_X86_ASM_AVAILABLE) && defined(__x86_64__)
 	__asm__ ("bswap %0" : "=r" (value) : "0" (value));
 	return value;
-#elif defined(CRYPTOPP_BYTESWAP_AVAILABLE)
-	return bswap_64(value);
 #elif (_MSC_VER >= 1400) || (defined(_MSC_VER) && !defined(_DLL))
 	return _byteswap_uint64(value);
 #elif CRYPTOPP_BOOL_SLOW_WORD64
@@ -2035,7 +2101,7 @@ inline word64 ByteReverse(word64 value)
 
 /// \brief Reverses bits in a 8-bit value
 /// \param value the 8-bit value to reverse
-/// \details BitReverse performs a combination of shifts on the byte
+/// \details BitReverse performs a combination of shifts on the byte.
 inline byte BitReverse(byte value)
 {
 	value = byte((value & 0xAA) >> 1) | byte((value & 0x55) << 1);
@@ -2045,29 +2111,45 @@ inline byte BitReverse(byte value)
 
 /// \brief Reverses bits in a 16-bit value
 /// \param value the 16-bit value to reverse
-/// \details BitReverse performs a combination of shifts on the word16
+/// \details BitReverse performs a combination of shifts on the word16.
 inline word16 BitReverse(word16 value)
 {
+#if defined(CRYPTOPP_ARM_BITREV_AVAILABLE)
+	// 4 instructions on ARM.
+	word32 rvalue;
+	__asm__ ("rbit %0, %1" : "=r" (rvalue) : "r" (value));
+	return word16(rvalue >> 16);
+#else
+	// 15 instructions on ARM.
 	value = word16((value & 0xAAAA) >> 1) | word16((value & 0x5555) << 1);
 	value = word16((value & 0xCCCC) >> 2) | word16((value & 0x3333) << 2);
 	value = word16((value & 0xF0F0) >> 4) | word16((value & 0x0F0F) << 4);
 	return ByteReverse(value);
+#endif
 }
 
 /// \brief Reverses bits in a 32-bit value
 /// \param value the 32-bit value to reverse
-/// \details BitReverse performs a combination of shifts on the word32
+/// \details BitReverse performs a combination of shifts on the word32.
 inline word32 BitReverse(word32 value)
 {
+#if defined(CRYPTOPP_ARM_BITREV_AVAILABLE)
+	// 2 instructions on ARM.
+	word32 rvalue;
+	__asm__ ("rbit %0, %1" : "=r" (rvalue) : "r" (value));
+	return rvalue;
+#else
+	// 19 instructions on ARM.
 	value = word32((value & 0xAAAAAAAA) >> 1) | word32((value & 0x55555555) << 1);
 	value = word32((value & 0xCCCCCCCC) >> 2) | word32((value & 0x33333333) << 2);
 	value = word32((value & 0xF0F0F0F0) >> 4) | word32((value & 0x0F0F0F0F) << 4);
 	return ByteReverse(value);
+#endif
 }
 
 /// \brief Reverses bits in a 64-bit value
 /// \param value the 64-bit value to reverse
-/// \details BitReverse performs a combination of shifts on the word64
+/// \details BitReverse performs a combination of shifts on the word64.
 inline word64 BitReverse(word64 value)
 {
 #if CRYPTOPP_BOOL_SLOW_WORD64
@@ -2095,9 +2177,11 @@ inline T BitReverse(T value)
 		return (T)BitReverse((word16)value);
 	else if (sizeof(T) == 4)
 		return (T)BitReverse((word32)value);
+	else if (sizeof(T) == 8)
+		return (T)BitReverse((word64)value);
 	else
 	{
-		CRYPTOPP_ASSERT(sizeof(T) == 8);
+		CRYPTOPP_ASSERT(0);
 		return (T)BitReverse((word64)value);
 	}
 }
