@@ -1,3 +1,2 @@
 #!/bin/bash
-
-wget https://github.com/zeroc-ice/ice/archive/v3.7.2.tar.gz
+git clone -b 3.7 https://github.com/zeroc-ice/ice 
