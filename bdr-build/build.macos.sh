@@ -3,10 +3,7 @@
 # This script is part of the BDR quick-start guide.
 #
 
-sudo apt -y install libssl-dev 
-sudo apt -y install flex libfl-dev
-sudo apt -y install libreadline-dev
-sudo apt -y install bison libbison-dev
+brew install readline flex bison talloc
 
 tar xvfj bdr-pg-src.tar.bz2
 tar xvfj bdr-plugin-src.tar.bz2
@@ -14,10 +11,10 @@ tar xvfj bdr-plugin-src.tar.bz2
 DESTDIR=$PWD/bdr
 pushd bdr-pg-src
 ./configure --prefix=$DESTDIR 2>&1 | tee -a "$LOGFILE"
-make -s | tee -a "$LOGFILE"
-make -s install 2>&1 | tee -a "$LOGFILE"
-make -s -C contrib 2>&1 | tee -a "$LOGFILE"
-make -s -C contrib install 2>&1 | tee -a "$LOGFILE"
+make -j8 -s | tee -a "$LOGFILE"
+make -j8 -s install 2>&1 | tee -a "$LOGFILE"
+make -j8 -s -C contrib 2>&1 | tee -a "$LOGFILE"
+make -j8 -s -C contrib install 2>&1 | tee -a "$LOGFILE"
 popd
 
 echo "PostgreSQL for BDR compiled and installed."
@@ -25,8 +22,8 @@ echo "Preparing BDR extension..."
 
 pushd bdr-plugin-src
 PATH=$DESTDIR/bin:$PATH ./configure 2>&1 | tee -a "$LOGFILE"
-make -s 2>&1 | tee -a "$LOGFILE"
-make -s install 2>&1 | tee -a "$LOGFILE"
+make -j8 -s 2>&1 | tee -a "$LOGFILE"
+make -j8 -s install 2>&1 | tee -a "$LOGFILE"
 popd
 
 echo
