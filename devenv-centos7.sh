@@ -28,7 +28,7 @@ sudo python get-pip.py
 sudo pip install conan
 
 # install dev libs
-sudo yum install -y git libtool libtalloc-devel hiredis-devel openssl-devel readline-devel readline bison-devel bison flex-devel
+sudo yum install -y git libtool libtalloc-devel hiredis-devel openssl-devel readline-devel readline bison-devel bison flex-devel libcrul-devel json-c-devel
 #libpqxx-devel
 sudo yum install -y redhat-lsb-core
 
