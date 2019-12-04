@@ -7,6 +7,7 @@ sudo apt -y install libssl-dev
 sudo apt -y install flex libfl-dev
 sudo apt -y install libreadline-dev
 sudo apt -y install bison libbison-dev
+sudo apt -y install zlib1g-dev
 
 tar xvfj bdr-pg-src.tar.bz2
 tar xvfj bdr-plugin-src.tar.bz2
