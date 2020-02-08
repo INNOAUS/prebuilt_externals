@@ -16,7 +16,7 @@
 
 
 #!/bin/bash
-git clone --recursive https://github.com/jtv/libpqxx.git
+git clone -b 6.3 --recursive https://github.com/jtv/libpqxx.git
 mkdir -p libpqxx/build
 pushd libpqxx/build
 export PostgresSQL_ROOT=$HOME/2ndquadrant_bdr/pgsql-9.4
