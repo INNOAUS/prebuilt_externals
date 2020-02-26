@@ -12,7 +12,7 @@ sudo apt -y install zlib1g-dev
 tar xvfj bdr-pg-src.tar.bz2
 tar xvfj bdr-plugin-src.tar.bz2
 
-DESTDIR=$PWD/bdr
+DESTDIR=$1/bdr
 pushd bdr-pg-src
 ./configure --prefix=$DESTDIR 2>&1 | tee -a "$LOGFILE"
 make -s | tee -a "$LOGFILE"

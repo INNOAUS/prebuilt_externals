@@ -1,9 +1,0 @@
-libdir=/git-innoaus/prebuilt_externals/raspbian/devtools/lib
-includedir=/git-innoaus/prebuilt_externals/raspbian/devtools/include/docopt
-
-Name: docopt.cpp
-Description: C++11 port of docopt
-Version: 0.6.2
-Requires:
-Libs: -L${libdir} -ldocopt
-Cflags: -I${includedir}

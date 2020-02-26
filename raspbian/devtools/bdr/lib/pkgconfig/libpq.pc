@@ -1,9 +1,0 @@
-Name: libpq
-Description: PostgreSQL libpq library
-Url: http://www.postgresql.org/
-Version: 9.4.13
-Requires: 
-Requires.private: 
-Cflags: -I/root/2ndquadrant_bdr/bdr/include
-Libs: -L/root/2ndquadrant_bdr/bdr/lib -lpq
-Libs.private:  -lcrypt -lpthread
