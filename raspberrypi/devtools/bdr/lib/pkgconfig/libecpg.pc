@@ -1,9 +1,0 @@
-Name: libecpg
-Description: PostgreSQL libecpg library
-Url: http://www.postgresql.org/
-Version: 9.4.13
-Requires: 
-Requires.private: libpq libpgtypes
-Cflags: -I/home/pi/git-innoaus/prebuilt_externals/raspberrypi/devtools/bdr/include
-Libs: -L/home/pi/git-innoaus/prebuilt_externals/raspberrypi/devtools/bdr/lib -lecpg
-Libs.private:  -lm -lpthread

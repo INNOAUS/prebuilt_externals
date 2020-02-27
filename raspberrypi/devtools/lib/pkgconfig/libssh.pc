@@ -1,6 +1,0 @@
-Name: libssh
-Description: The SSH Library
-Version: 0.8.90
-Libs: -L/home/pi/git-innoaus/prebuilt_externals/raspberrypi/devtools/lib -lssh
-Cflags: -I/home/pi/git-innoaus/prebuilt_externals/raspberrypi/devtools/include
-

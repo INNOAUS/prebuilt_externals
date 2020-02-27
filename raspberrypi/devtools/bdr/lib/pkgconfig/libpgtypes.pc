@@ -1,9 +1,0 @@
-Name: libpgtypes
-Description: PostgreSQL libpgtypes library
-Url: http://www.postgresql.org/
-Version: 9.4.13
-Requires: 
-Requires.private: 
-Cflags: -I/home/pi/git-innoaus/prebuilt_externals/raspberrypi/devtools/bdr/include
-Libs: -L/home/pi/git-innoaus/prebuilt_externals/raspberrypi/devtools/bdr/lib -lpgtypes
-Libs.private:  -lm
