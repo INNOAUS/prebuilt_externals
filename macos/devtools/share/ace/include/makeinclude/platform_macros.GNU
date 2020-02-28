@@ -1,3 +1,0 @@
-include $(ACE_ROOT)/include/makeinclude/platform_macosx.GNU
-INSTALL_PREFIX=$(HOME)/git-innoaus/prebuilt_externals/macos/devtools
-CPPFLAGS=-fPIC
