@@ -1,10 +1,12 @@
-.TH RADMIN 8 "03 Feb 2015" "" "FreeRADIUS Server Administration Tool"
+.TH RADMIN 8 "11 Mar 2019" "" "FreeRADIUS Server Administration Tool"
 .SH NAME
 radmin - FreeRADIUS Administration tool
 .SH SYNOPSIS
 .B radmin
 .RB [ \-d
 .IR config_directory ]
+.RB [ \-D
+.IR dictionary_directory ]
 .RB [ \-e
 .IR command ]
 .RB [ \-E ]
@@ -34,6 +36,8 @@ The following command-line options are accepted by the program.
 Defaults to \fI/etc/raddb\fP. \fBradmin\fP looks here for the server
 configuration files to find the "listen" section that defines the
 control socket filename.
+.IP "\-D \fIdictionary directory\fP"
+Set main dictionary directory. Defaults to \fI/usr/share/freeradius\fP.
 .IP "\-e \fIcommand\fP"
 Run \fIcommand\fP and exit.
 .IP \-E
@@ -134,8 +138,8 @@ set state for given home server
 do sub-command of show
 .IP show\ client\ <command>
 do sub-command of client
-.IP show\ client\ config\ <ipaddr>
-show configuration for given client
+.IP show\ client\ config\ <ipaddr>\ [udp|tcp]
+shows configuration for a given client.
 .IP show\ client\ list
 shows list of global clients
 .IP show\ debug\ <command>
@@ -174,7 +178,7 @@ Prints out configuration as XML
 do sub-command of stats
 .IP stats\ client\ [auth/acct]\ <ipaddr>
 show statistics for given client, or for all clients (auth or acct)
-.IP stats\ home_server\ [<ipaddr>/auth/acct]\ <port>
+.IP stats\ home_server\ [<ipaddr>|auth|acct]\ <port>
 show statistics for given home server (ipaddr and port), or for all home servers (auth or acct)
 .IP stats\ detail\ <filename>
 show statistics for the given detail file

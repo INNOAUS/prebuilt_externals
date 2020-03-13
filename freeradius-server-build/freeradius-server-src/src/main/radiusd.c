@@ -17,7 +17,7 @@
  *   along with this program; if not, write to the Free Software
  *   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  *
- * Copyright 2000-2012  The FreeRADIUS server project
+ * Copyright 2000-2019  The FreeRADIUS server project
  * Copyright 1999,2000  Miquel van Smoorenburg <miquels@cistron.nl>
  * Copyright 2000  Alan DeKok <aland@ox.org>
  * Copyright 2000  Alan Curry <pacman-radius@cqc.com>
@@ -31,6 +31,7 @@ RCSID("$Id$")
 #include <freeradius-devel/modules.h>
 #include <freeradius-devel/state.h>
 #include <freeradius-devel/rad_assert.h>
+#include <freeradius-devel/autoconf.h>
 
 #include <sys/file.h>
 
@@ -49,6 +50,10 @@ RCSID("$Id$")
 #endif
 #ifndef WIFEXITED
 #	define WIFEXITED(stat_val) (((stat_val) & 255) == 0)
+#endif
+
+#ifdef HAVE_SYSTEMD
+#  include <systemd/sd-daemon.h>
 #endif
 
 /*
@@ -379,6 +384,37 @@ int main(int argc, char *argv[])
 		}
 	}
 
+	/*
+	 *  The systemd watchdog enablement must be checked before we
+	 *  daemonize, but the notifications can come from any process.
+	 */
+#ifdef HAVE_SYSTEMD_WATCHDOG
+	if (!check_config) {
+		uint64_t usec;
+
+		if ((sd_watchdog_enabled(0, &usec) > 0) && (usec > 0)) {
+			usec /= 2;
+			fr_timeval_from_usec(&sd_watchdog_interval, usec);
+
+			INFO("systemd watchdog interval is %ld.%.2ld secs", sd_watchdog_interval.tv_sec, sd_watchdog_interval.tv_usec);
+		} else {
+			INFO("systemd watchdog is disabled");
+		}
+	}
+#else
+	/*
+	 *	Some users get frustrated due to can't handle the service using "systemctl start radiusd"
+	 *	even when the SO supports systemd. The reason is because the FreeRADIUS version was built
+	 *	without the proper support.
+	 *
+	 *	Then, as can be seen in https://www.systutorials.com/docs/linux/man/3-sd_notify/
+	 *	We could assume that if find the NOTIFY_SOCKET, it's because we are under systemd.
+	 *
+	 */
+	if (getenv("NOTIFY_SOCKET"))
+		WARN("Built without support for systemd watchdog, but running under systemd.");
+#endif
+
 #ifndef __MINGW32__
 	/*
 	 *  Disconnect from session
@@ -443,6 +479,14 @@ int main(int argc, char *argv[])
 				waitpid(pid, &stat_loc, WNOHANG);
 				exit(EXIT_FAILURE);
 			}
+
+#ifdef HAVE_SYSTEMD
+			/*
+			 *	Update the systemd MAINPID to be our child,
+			 *	as the parent is about to exit.
+			 */
+			sd_notifyf(0, "MAINPID=%lu", (unsigned long)pid);
+#endif
 
 			exit(EXIT_SUCCESS);
 		}
@@ -580,6 +624,16 @@ int main(int argc, char *argv[])
 	 *  Initialise the state rbtree (used to link multiple rounds of challenges).
 	 */
 	state = fr_state_init(NULL);
+
+#ifdef HAVE_SYSTEMD
+	{
+		int ret_notif;
+
+		ret_notif = sd_notify(0, "READY=1\nSTATUS=Processing requests");
+		if (ret_notif < 0)
+			WARN("Failed notifying systemd that process is READY: %s", fr_syserror(ret_notif));
+	}
+#endif
 
 	/*
 	 *  Process requests until HUP or exit.

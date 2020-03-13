@@ -37,8 +37,8 @@ USES_APPLE_DEPRECATED_API
 /*
  *	In rlm_mschap.c
  */
-void mschap_add_reply(REQUEST *request, VALUE_PAIR** vp, unsigned char ident,
-		      char const* name, char const* value, int len);
+void mschap_add_reply(REQUEST *request, unsigned char ident,
+		      char const *name, char const *value, size_t len);
 
 /*
  *	Only used by rlm_mschap.c
@@ -138,14 +138,16 @@ static rlm_rcode_t getUserNodeRef(REQUEST *request, char* inUserName, char **out
 				if (strcmp(pAttrEntry->fAttributeSignature.fBufferData, kDSNAttrMetaNodeLocation) == 0) {
 					status = dsGetAttributeValue(nodeRef, tDataBuff, 1, valueRef, &pValueEntry);
 					if (status == eDSNoErr && pValueEntry != NULL) {
-						pUserLocation = talloc_zero_array(request, char, pValueEntry->fAttributeValueData.fBufferLength + 1);
+						pUserLocation = talloc_array(request, char, pValueEntry->fAttributeValueData.fBufferLength + 1);
 						memcpy(pUserLocation, pValueEntry->fAttributeValueData.fBufferData, pValueEntry->fAttributeValueData.fBufferLength);
+						pUserLocation[pValueEntry->fAttributeValueData.fBufferLength] = '\0';
 					}
 				} else if (strcmp(pAttrEntry->fAttributeSignature.fBufferData, kDSNAttrRecordName) == 0) {
 					status = dsGetAttributeValue(nodeRef, tDataBuff, 1, valueRef, &pValueEntry);
 					if (status == eDSNoErr && pValueEntry != NULL) {
 						*outUserName = talloc_array(request, char, pValueEntry->fAttributeValueData.fBufferLength + 1);
 						memcpy(*outUserName, pValueEntry->fAttributeValueData.fBufferData, pValueEntry->fAttributeValueData.fBufferLength);
+						*outUserName[pValueEntry->fAttributeValueData.fBufferLength] = '\0';
 					}
 				}
 
@@ -298,10 +300,12 @@ rlm_rcode_t od_mschap_auth(REQUEST *request, VALUE_PAIR *challenge, VALUE_PAIR *
 	pAuthType = dsDataNodeAllocateString(dsRef, kDSStdAuthMSCHAP2);
 	uiCurr = 0;
 
-	RDEBUG2("OD username_string = %s, OD shortUserName=%s (length = %lu)\n", username_string, shortUserName, strlen(shortUserName));
-
 	/* User name length + username */
-	uiLen = (uint32_t)strlen(shortUserName);
+	uiLen = (uint32_t)(shortUserName ? strlen(shortUserName) : 0);
+
+	RDEBUG2("OD username_string = %s, OD shortUserName=%s (length = %d)\n",
+				username_string, shortUserName, uiLen);
+
 	memcpy(&(tDataBuff->fBufferData[uiCurr]), &uiLen, sizeof(uiLen));
 	uiCurr += sizeof(uiLen);
 	memcpy(&(tDataBuff->fBufferData[uiCurr]), shortUserName, uiLen);
@@ -369,20 +373,19 @@ rlm_rcode_t od_mschap_auth(REQUEST *request, VALUE_PAIR *challenge, VALUE_PAIR *
 				 pStepBuff, NULL);
 	if (status == eDSNoErr) {
 		if (pStepBuff->fBufferLength > 4) {
-			size_t len;
+			uint32_t len;
 
 			memcpy(&len, pStepBuff->fBufferData, sizeof(len));
 			if (len == 40) {
 				char mschap_reply[42] = { '\0' };
-				pStepBuff->fBufferData[len+4] = '\0';
 				mschap_reply[0] = 'S';
 				mschap_reply[1] = '=';
 				memcpy(&(mschap_reply[2]), &(pStepBuff->fBufferData[4]), len);
-				mschap_add_reply(request, &request->reply->vps,
+				mschap_add_reply(request,
 						 *response->vp_strvalue,
 						 "MS-CHAP2-Success",
 						 mschap_reply, len+2);
-				RDEBUG2("dsDoDirNodeAuth returns stepbuff: %s (len=%zu)\n", mschap_reply, len);
+				RDEBUG2("dsDoDirNodeAuth returns stepbuff: %s (len=%u)\n", mschap_reply, (unsigned int) len);
 			}
 		}
 	}

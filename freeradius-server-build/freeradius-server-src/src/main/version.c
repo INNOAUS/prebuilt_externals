@@ -17,7 +17,7 @@
  *   along with this program; if not, write to the Free Software
  *   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  *
- * Copyright 1999-2014  The FreeRADIUS server project
+ * Copyright 1999-2019  The FreeRADIUS server project
  * Copyright 2012  Alan DeKok <aland@ox.org>
  * Copyright 2000  Chris Parker <cparker@starnetusa.com>
  */
@@ -43,6 +43,8 @@ static long ssl_built = OPENSSL_VERSION_NUMBER;
  *
  * Where status >= 0 && < 10 means beta, and status 10 means release.
  *
+ *	https://wiki.openssl.org/index.php/Versioning
+ *
  * Startup check for whether the linked version of OpenSSL matches the
  * version the server was built against.
  *
@@ -53,6 +55,24 @@ int ssl_check_consistency(void)
 	long ssl_linked;
 
 	ssl_linked = SSLeay();
+
+	/*
+	 *	Major and minor versions mismatch, that's bad.
+	 */
+	if ((ssl_linked & 0xfff00000) != (ssl_built & 0xfff00000)) goto mismatch;
+
+	/*
+	 *	1.1.0 and later export all of the APIs we need, so we
+	 *	don't care about mismatches in fix / patch / status
+	 *	fields.  If the major && minor fields match, that's
+	 *	good enough.
+	 */
+	if ((ssl_linked & 0xfff00000) >= 0x10100000) return 0;
+
+	/*
+	 *	Before 1.1.0, we need all kinds of stupid checks to
+	 *	see if it might work.
+	 */
 
 	/*
 	 *	Status mismatch always triggers error.
@@ -415,6 +435,14 @@ void version_init_features(CONF_SECTION *cs)
 #endif
 				);
 
+	version_add_feature(cs, "systemd",
+#ifdef HAVE_SYSTEMD
+				true
+#else
+				false
+#endif
+				);
+
 	version_add_feature(cs, "tcp",
 #ifdef WITH_TCP
 				true
@@ -577,7 +605,7 @@ void version_print(void)
 		DEBUG2("  ");
 	}
 	INFO("FreeRADIUS Version " RADIUSD_VERSION_STRING);
-	INFO("Copyright (C) 1999-2017 The FreeRADIUS server project and contributors");
+	INFO("Copyright (C) 1999-2019 The FreeRADIUS server project and contributors");
 	INFO("There is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A");
 	INFO("PARTICULAR PURPOSE");
 	INFO("You may redistribute copies of FreeRADIUS under the terms of the");

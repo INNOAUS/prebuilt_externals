@@ -153,6 +153,7 @@ static CONF_PARSER group_config[] = {
 	{ "cacheable_name", FR_CONF_OFFSET(PW_TYPE_BOOLEAN, rlm_ldap_t, cacheable_group_name), "no" },
 	{ "cacheable_dn", FR_CONF_OFFSET(PW_TYPE_BOOLEAN, rlm_ldap_t, cacheable_group_dn), "no" },
 	{ "cache_attribute", FR_CONF_OFFSET(PW_TYPE_STRING, rlm_ldap_t, cache_attribute), NULL },
+	{ "allow_dangling_group_ref", FR_CONF_OFFSET(PW_TYPE_BOOLEAN, rlm_ldap_t, allow_dangling_group_refs), "no" },
 	CONF_PARSER_TERMINATOR
 };
 
@@ -224,6 +225,8 @@ static const CONF_PARSER module_config[] = {
 	{ "sasl", FR_CONF_OFFSET(PW_TYPE_SUBSECTION, rlm_ldap_t, admin_sasl), (void const *) sasl_mech_static },
 
 	{ "valuepair_attribute", FR_CONF_OFFSET(PW_TYPE_STRING, rlm_ldap_t, valuepair_attr), NULL },
+
+	{ "user_dn", FR_CONF_OFFSET(PW_TYPE_STRING, rlm_ldap_t, user_dn), NULL },
 
 #ifdef WITH_EDIR
 	/* support for eDirectory Universal Password */
@@ -613,6 +616,24 @@ static int mod_bootstrap(CONF_SECTION *conf, void *instance)
 		inst->cache_da = dict_attrbyname(inst->cache_attribute);
 	} else {
 		inst->cache_da = inst->group_da;	/* Default to the group_da */
+	}
+
+	if (!inst->user_dn || !*inst->user_dn) {
+		inst->user_dn = talloc_strdup(inst, "LDAP-UserDn");
+	}
+
+	/*
+	 *	Check or create the LDAP-UserDn attribute.
+	 */
+	if (inst->user_dn) {
+		ATTR_FLAGS flags;
+
+		memset(&flags, 0, sizeof(flags));
+		if (dict_addattr(inst->user_dn, -1, 0, PW_TYPE_STRING, flags) < 0) {
+			LDAP_ERR("Error creating %s attribute: %s", inst->user_dn, fr_strerror());
+			return -1;
+		}
+		inst->user_dn_da = dict_attrbyname(inst->user_dn);
 	}
 
 	xlat_register(inst->name, ldap_xlat, rlm_ldap_escape_func, inst);

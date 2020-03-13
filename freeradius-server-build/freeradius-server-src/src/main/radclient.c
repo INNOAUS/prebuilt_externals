@@ -351,11 +351,11 @@ static int radclient_init(TALLOC_CTX *ctx, rc_file_pair_t *files)
 			goto error;
 		}
 
-#ifdef WITH_TCP
 		request->packet->src_ipaddr = client_ipaddr;
 		request->packet->src_port = client_port;
 		request->packet->dst_ipaddr = server_ipaddr;
 		request->packet->dst_port = server_port;
+#ifdef WITH_TCP
 		request->packet->proto = ipproto;
 #endif
 
@@ -1106,6 +1106,8 @@ static int recv_one_packet(int wait_time)
 	 *	packet matched that.
 	 */
 	if ((request->filter_code != PW_CODE_UNDEFINED) && (request->reply->code != request->filter_code)) {
+		fr_strerror_printf(NULL);
+
 		if (is_radius_code(request->reply->code)) {
 			REDEBUG("%s: Expected %s got %s", request->name, fr_packet_codes[request->filter_code],
 				fr_packet_codes[request->reply->code]);

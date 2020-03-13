@@ -24,10 +24,12 @@
 %{!?_with_rlm_sql_oracle: %global _without_rlm_sql_oracle --without-rlm_sql_oracle}
 %endif
 
+%{?el6: %global _without_libwbclient --with-winbind-dir=/nonexistant}
+
 Summary: High-performance and highly configurable free RADIUS server
 Name: freeradius
-Version: 3.0.17
-Release: 2%{?dist}
+Version: 3.0.20
+Release: 1%{?dist}
 License: GPLv2+ and LGPLv2+
 Group: System Environment/Daemons
 URL: http://www.freeradius.org/
@@ -61,7 +63,9 @@ BuildRequires: net-snmp-devel
 BuildRequires: net-snmp-utils
 %{?el7:BuildRequires: libwbclient-devel}
 %{?el7:BuildRequires: samba-devel}
-%{?el6:BuildRequires: samba4-devel}
+%if %{?_unitdir:1}%{!?_unitdir:0}
+BuildRequires: systemd-devel
+%endif
 BuildRequires: readline-devel
 BuildRequires: libpcap-devel
 BuildRequires: libtalloc-devel
@@ -77,10 +81,9 @@ Requires: readline
 Requires: libtalloc
 Requires: net-snmp
 %{?el7:Requires: libwbclient}
-%{?el6:Requires: samba4-libs}
-%{?el6:Requires: samba4-winbind-clients}
 Requires: zlib
 Requires: pam
+%{?el6:Requires: redhat-lsb-core}
 
 %if %{?_with_rlm_idn:1}%{?!_with_rlm_idn:0}
 Requires: libidn
@@ -185,8 +188,10 @@ This plugin provides Perl support for the FreeRADIUS server project.
 Summary: Python support for FreeRADIUS
 Group: System Environment/Daemons
 Requires: %{name} = %{version}-%{release}
-Requires: python
-BuildRequires: python-devel
+%{!?el8:Requires: python}
+%{?el8:Requires: python2}
+%{!?el8:BuildRequires: python-devel}
+%{?el8:BuildRequires: python2-devel}
 
 %description python
 This plugin provides Python support for the FreeRADIUS server project.
@@ -327,6 +332,7 @@ export LDFLAGS="-Wl,--build-id"
 
 %configure \
         --libdir=%{_libdir}/freeradius \
+        --sysconfdir=%{_sysconfdir} \
         --disable-ltdl-install \
         --with-gnu-ld \
         --with-threads \
@@ -345,10 +351,12 @@ export LDFLAGS="-Wl,--build-id"
         --without-rlm_sql_iodbc \
         --without-rlm_sql_firebird \
         --without-rlm_sql_db2 \
+        --without-rlm_sql_mongo \
         --with-jsonc-lib-dir=%{_libdir} \
         --with-jsonc-include-dir=/usr/include/json \
         --with-winbind-include-dir=/usr/include/samba-4.0 \
         --with-winbind-lib-dir=/usr/lib64/samba \
+        --with-systemd \
         %{?_with_rlm_yubikey} \
         %{?_without_rlm_yubikey} \
         %{?_with_rlm_sql_oracle} \
@@ -369,6 +377,7 @@ export LDFLAGS="-Wl,--build-id"
         %{?_without_rlm_ruby} \
         %{?_with_rlm_cache_memcached} \
         %{?_without_rlm_cache_memcached} \
+        %{?_without_libwbclient} \
 #        --with-modules="rlm_wimax" \
 
 make %_smp_mflags
@@ -427,6 +436,8 @@ rm -rf $RPM_BUILD_ROOT/%{_includedir}
 # remove unsupported config files
 rm -f $RPM_BUILD_ROOT/%{_sysconfdir}/raddb/experimental.conf
 rm -rf $RPM_BUILD_ROOT/%{_sysconfdir}/raddb/mods-config/unbound
+rm -rf $RPM_BUILD_ROOT/%{_sysconfdir}/raddb/mods-config/sql/ippool/mongo
+rm -rf $RPM_BUILD_ROOT/%{_sysconfdir}/raddb/mods-config/sql/main/mongo
 
 # install doc files omitted by standard install
 for f in COPYRIGHT CREDITS INSTALL.rst README.rst; do
@@ -467,13 +478,17 @@ exit 0
 
 %post
 if [ $1 = 1 ]; then
+%if %{?_unitdir:1}%{!?_unitdir:0}
+  /bin/systemctl enable radiusd.service
+%else
   /sbin/chkconfig --add radiusd
+%endif
 fi
 
 %post config
 if [ $1 = 1 ]; then
-  if [ ! -e /etc/raddb/certs/server.pem ]; then
-    /sbin/runuser -g radiusd -c 'umask 007; /etc/raddb/certs/bootstrap' > /dev/null 2>&1 || :
+  if [ ! -e %{_sysconfdir}/raddb/certs/server.pem ]; then
+    /sbin/runuser -g radiusd -c 'umask 007; %{_sysconfdir}/raddb/certs/bootstrap' > /dev/null 2>&1 || :
   fi
 fi
 
@@ -481,7 +496,8 @@ fi
 %preun
 if [ $1 = 0 ]; then
 %if %{?_unitdir:1}%{!?_unitdir:0}
-  /bin/systemctl disable radiusd
+  /bin/systemctl stop radiusd.service || :
+  /bin/systemctl disable radiusd.service || :
 %else
   /sbin/chkconfig --del radiusd
 %endif
@@ -620,113 +636,113 @@ fi
 %endif
 
 %files config
-%dir %attr(755,root,radiusd) /etc/raddb
+%dir %attr(755,root,radiusd) %{_sysconfdir}/raddb
 %defattr(-,root,radiusd)
-#%attr(640,root,radiusd) %config(noreplace) /etc/raddb/filter/*
-%attr(644,root,radiusd) %config(noreplace) /etc/raddb/dictionary
-%attr(640,root,radiusd) %config(noreplace) /etc/raddb/clients.conf
-%config(noreplace) /etc/raddb/hints
-%config(noreplace) /etc/raddb/huntgroups
-%attr(640,root,radiusd) %config(noreplace) /etc/raddb/panic.gdb
-%attr(640,root,radiusd) %config(noreplace) /etc/raddb/README.rst
-%attr(640,root,radiusd) %config(noreplace) /etc/raddb/proxy.conf
-%attr(640,root,radiusd) %config(noreplace) /etc/raddb/radiusd.conf
-%attr(640,root,radiusd) %config(noreplace) /etc/raddb/trigger.conf
-#%dir %attr(750,root,radiusd) /etc/raddb/sql
-#%attr(640,root,radiusd) %config(noreplace) /etc/raddb/sql/oracle/*
-%attr(640,root,radiusd) %config(noreplace) /etc/raddb/users
-%dir %attr(770,root,radiusd) /etc/raddb/certs
-%attr(640,root,radiusd) %config(noreplace) /etc/raddb/certs/*
-%attr(750,root,radiusd) /etc/raddb/certs/bootstrap
-%dir %attr(750,root,radiusd) /etc/raddb/sites-available
-%attr(640,root,radiusd) %config(noreplace) /etc/raddb/sites-available/*
-%dir %attr(750,root,radiusd) /etc/raddb/sites-enabled
-%attr(640,root,radiusd) %config(noreplace) /etc/raddb/sites-enabled/*
-%dir %attr(750,root,radiusd) /etc/raddb/policy.d
-%attr(640,root,radiusd) %config(noreplace) /etc/raddb/policy.d/*
-%attr(640,root,radiusd) %config(noreplace) /etc/raddb/templates.conf
-%dir %attr(750,root,radiusd) /etc/raddb/mods-available
-%attr(640,root,radiusd) %config(noreplace) /etc/raddb/mods-available/*
-%dir %attr(750,root,radiusd) /etc/raddb/mods-config
-%attr(640,root,radiusd) %config(noreplace) /etc/raddb/mods-config/README.rst
-%dir %attr(750,root,radiusd) /etc/raddb/mods-config/attr_filter
-%attr(640,root,radiusd) %config(noreplace) /etc/raddb/mods-config/attr_filter/*
-%dir %attr(750,root,radiusd) /etc/raddb/mods-config/files
-%attr(640,root,radiusd) %config(noreplace) /etc/raddb/mods-config/files/*
-%dir %attr(750,root,radiusd) /etc/raddb/mods-config/perl
-%attr(640,root,radiusd) %config(noreplace) /etc/raddb/mods-config/perl/*
-%dir %attr(750,root,radiusd) /etc/raddb/mods-config/preprocess
-%attr(640,root,radiusd) %config(noreplace) /etc/raddb/mods-config/preprocess/*
-%dir %attr(750,root,radiusd) /etc/raddb/mods-config/python
-%attr(640,root,radiusd) %config(noreplace) /etc/raddb/mods-config/python/*
-%dir %attr(750,root,radiusd) /etc/raddb/mods-enabled
-%attr(640,root,radiusd) %config(noreplace) /etc/raddb/mods-enabled/*
+#%attr(640,root,radiusd) %config(noreplace) %{_sysconfdir}/raddb/filter/*
+%attr(644,root,radiusd) %config(noreplace) %{_sysconfdir}/raddb/dictionary
+%attr(640,root,radiusd) %config(noreplace) %{_sysconfdir}/raddb/clients.conf
+%config(noreplace) %{_sysconfdir}/raddb/hints
+%config(noreplace) %{_sysconfdir}/raddb/huntgroups
+%attr(640,root,radiusd) %config(noreplace) %{_sysconfdir}/raddb/panic.gdb
+%attr(640,root,radiusd) %config(noreplace) %{_sysconfdir}/raddb/README.rst
+%attr(640,root,radiusd) %config(noreplace) %{_sysconfdir}/raddb/proxy.conf
+%attr(640,root,radiusd) %config(noreplace) %{_sysconfdir}/raddb/radiusd.conf
+%attr(640,root,radiusd) %config(noreplace) %{_sysconfdir}/raddb/trigger.conf
+#%dir %attr(750,root,radiusd) %{_sysconfdir}/raddb/sql
+#%attr(640,root,radiusd) %config(noreplace) %{_sysconfdir}/raddb/sql/oracle/*
+%attr(640,root,radiusd) %config(noreplace) %{_sysconfdir}/raddb/users
+%dir %attr(770,root,radiusd) %{_sysconfdir}/raddb/certs
+%attr(640,root,radiusd) %config(noreplace) %{_sysconfdir}/raddb/certs/*
+%attr(750,root,radiusd) %{_sysconfdir}/raddb/certs/bootstrap
+%dir %attr(750,root,radiusd) %{_sysconfdir}/raddb/sites-available
+%attr(640,root,radiusd) %config(noreplace) %{_sysconfdir}/raddb/sites-available/*
+%dir %attr(750,root,radiusd) %{_sysconfdir}/raddb/sites-enabled
+%attr(640,root,radiusd) %config(noreplace) %{_sysconfdir}/raddb/sites-enabled/*
+%dir %attr(750,root,radiusd) %{_sysconfdir}/raddb/policy.d
+%attr(640,root,radiusd) %config(noreplace) %{_sysconfdir}/raddb/policy.d/*
+%attr(640,root,radiusd) %config(noreplace) %{_sysconfdir}/raddb/templates.conf
+%dir %attr(750,root,radiusd) %{_sysconfdir}/raddb/mods-available
+%attr(640,root,radiusd) %config(noreplace) %{_sysconfdir}/raddb/mods-available/*
+%dir %attr(750,root,radiusd) %{_sysconfdir}/raddb/mods-config
+%attr(640,root,radiusd) %config(noreplace) %{_sysconfdir}/raddb/mods-config/README.rst
+%dir %attr(750,root,radiusd) %{_sysconfdir}/raddb/mods-config/attr_filter
+%attr(640,root,radiusd) %config(noreplace) %{_sysconfdir}/raddb/mods-config/attr_filter/*
+%dir %attr(750,root,radiusd) %{_sysconfdir}/raddb/mods-config/files
+%attr(640,root,radiusd) %config(noreplace) %{_sysconfdir}/raddb/mods-config/files/*
+%dir %attr(750,root,radiusd) %{_sysconfdir}/raddb/mods-config/perl
+%attr(640,root,radiusd) %config(noreplace) %{_sysconfdir}/raddb/mods-config/perl/*
+%dir %attr(750,root,radiusd) %{_sysconfdir}/raddb/mods-config/preprocess
+%attr(640,root,radiusd) %config(noreplace) %{_sysconfdir}/raddb/mods-config/preprocess/*
+%dir %attr(750,root,radiusd) %{_sysconfdir}/raddb/mods-config/python
+%attr(640,root,radiusd) %config(noreplace) %{_sysconfdir}/raddb/mods-config/python/*
+%dir %attr(750,root,radiusd) %{_sysconfdir}/raddb/mods-enabled
+%attr(640,root,radiusd) %config(noreplace) %{_sysconfdir}/raddb/mods-enabled/*
 # mysql
-%dir %attr(750,root,radiusd) /etc/raddb/mods-config/sql
-%dir %attr(750,root,radiusd) /etc/raddb/mods-config/sql/counter
-%dir %attr(750,root,radiusd) /etc/raddb/mods-config/sql/counter/mysql
-%attr(640,root,radiusd) %config(noreplace) /etc/raddb/mods-config/sql/counter/mysql/*
-%dir %attr(750,root,radiusd) /etc/raddb/mods-config/sql/cui
-%dir %attr(750,root,radiusd) /etc/raddb/mods-config/sql/cui/mysql
-%attr(640,root,radiusd) %config(noreplace) /etc/raddb/mods-config/sql/cui/mysql/*
-%dir %attr(750,root,radiusd) /etc/raddb/mods-config/sql/ippool-dhcp
-%dir %attr(750,root,radiusd) /etc/raddb/mods-config/sql/ippool-dhcp/mysql
-%attr(640,root,radiusd) %config(noreplace) /etc/raddb/mods-config/sql/ippool-dhcp/mysql/*
-%dir %attr(750,root,radiusd) /etc/raddb/mods-config/sql/ippool
-%dir %attr(750,root,radiusd) /etc/raddb/mods-config/sql/ippool/mysql
-%attr(640,root,radiusd) %config(noreplace) /etc/raddb/mods-config/sql/ippool/mysql/*
-%dir %attr(750,root,radiusd) /etc/raddb/mods-config/sql/main
-%dir %attr(750,root,radiusd) /etc/raddb/mods-config/sql/main/mysql
-%attr(640,root,radiusd) %config(noreplace) /etc/raddb/mods-config/sql/main/mysql/*
-%dir %attr(750,root,radiusd) /etc/raddb/mods-config/sql/main/ndb
-%attr(640,root,radiusd) %config(noreplace) /etc/raddb/mods-config/sql/main/ndb/*
-%dir %attr(750,root,radiusd) /etc/raddb/mods-config/sql/moonshot-targeted-ids/mysql
-%attr(640,root,radiusd) %config(noreplace) /etc/raddb/mods-config/sql/moonshot-targeted-ids/mysql/*
+%dir %attr(750,root,radiusd) %{_sysconfdir}/raddb/mods-config/sql
+%dir %attr(750,root,radiusd) %{_sysconfdir}/raddb/mods-config/sql/counter
+%dir %attr(750,root,radiusd) %{_sysconfdir}/raddb/mods-config/sql/counter/mysql
+%attr(640,root,radiusd) %config(noreplace) %{_sysconfdir}/raddb/mods-config/sql/counter/mysql/*
+%dir %attr(750,root,radiusd) %{_sysconfdir}/raddb/mods-config/sql/cui
+%dir %attr(750,root,radiusd) %{_sysconfdir}/raddb/mods-config/sql/cui/mysql
+%attr(640,root,radiusd) %config(noreplace) %{_sysconfdir}/raddb/mods-config/sql/cui/mysql/*
+%dir %attr(750,root,radiusd) %{_sysconfdir}/raddb/mods-config/sql/ippool-dhcp
+%dir %attr(750,root,radiusd) %{_sysconfdir}/raddb/mods-config/sql/ippool-dhcp/mysql
+%attr(640,root,radiusd) %config(noreplace) %{_sysconfdir}/raddb/mods-config/sql/ippool-dhcp/mysql/*
+%dir %attr(750,root,radiusd) %{_sysconfdir}/raddb/mods-config/sql/ippool
+%dir %attr(750,root,radiusd) %{_sysconfdir}/raddb/mods-config/sql/ippool/mysql
+%attr(640,root,radiusd) %config(noreplace) %{_sysconfdir}/raddb/mods-config/sql/ippool/mysql/*
+%dir %attr(750,root,radiusd) %{_sysconfdir}/raddb/mods-config/sql/main
+%dir %attr(750,root,radiusd) %{_sysconfdir}/raddb/mods-config/sql/main/mysql
+%attr(640,root,radiusd) %config(noreplace) %{_sysconfdir}/raddb/mods-config/sql/main/mysql/*
+%dir %attr(750,root,radiusd) %{_sysconfdir}/raddb/mods-config/sql/main/ndb
+%attr(640,root,radiusd) %config(noreplace) %{_sysconfdir}/raddb/mods-config/sql/main/ndb/*
+%dir %attr(750,root,radiusd) %{_sysconfdir}/raddb/mods-config/sql/moonshot-targeted-ids/mysql
+%attr(640,root,radiusd) %config(noreplace) %{_sysconfdir}/raddb/mods-config/sql/moonshot-targeted-ids/mysql/*
 # postgres
-%dir %attr(750,root,radiusd) /etc/raddb/mods-config/sql/counter/postgresql
-%attr(640,root,radiusd) %config(noreplace) /etc/raddb/mods-config/sql/counter/postgresql/*
-%dir %attr(750,root,radiusd) /etc/raddb/mods-config/sql/cui/postgresql
-%attr(640,root,radiusd) %config(noreplace) /etc/raddb/mods-config/sql/cui/postgresql/*
-%dir %attr(750,root,radiusd) /etc/raddb/mods-config/sql/ippool/postgresql
-%attr(640,root,radiusd) %config(noreplace) /etc/raddb/mods-config/sql/ippool/postgresql/*
-%dir %attr(750,root,radiusd) /etc/raddb/mods-config/sql/main/postgresql
-%attr(640,root,radiusd) %config(noreplace) /etc/raddb/mods-config/sql/main/postgresql/*
-%dir %attr(750,root,radiusd) /etc/raddb/mods-config/sql/moonshot-targeted-ids/postgresql
-%attr(640,root,radiusd) %config(noreplace) /etc/raddb/mods-config/sql/moonshot-targeted-ids/postgresql/*
+%dir %attr(750,root,radiusd) %{_sysconfdir}/raddb/mods-config/sql/counter/postgresql
+%attr(640,root,radiusd) %config(noreplace) %{_sysconfdir}/raddb/mods-config/sql/counter/postgresql/*
+%dir %attr(750,root,radiusd) %{_sysconfdir}/raddb/mods-config/sql/cui/postgresql
+%attr(640,root,radiusd) %config(noreplace) %{_sysconfdir}/raddb/mods-config/sql/cui/postgresql/*
+%dir %attr(750,root,radiusd) %{_sysconfdir}/raddb/mods-config/sql/ippool/postgresql
+%attr(640,root,radiusd) %config(noreplace) %{_sysconfdir}/raddb/mods-config/sql/ippool/postgresql/*
+%dir %attr(750,root,radiusd) %{_sysconfdir}/raddb/mods-config/sql/main/postgresql
+%attr(640,root,radiusd) %config(noreplace) %{_sysconfdir}/raddb/mods-config/sql/main/postgresql/*
+%dir %attr(750,root,radiusd) %{_sysconfdir}/raddb/mods-config/sql/moonshot-targeted-ids/postgresql
+%attr(640,root,radiusd) %config(noreplace) %{_sysconfdir}/raddb/mods-config/sql/moonshot-targeted-ids/postgresql/*
 # sqlite
-%dir %attr(750,root,radiusd) /etc/raddb/mods-config/sql/counter/sqlite
-%attr(640,root,radiusd) %config(noreplace) /etc/raddb/mods-config/sql/counter/sqlite/*
-%dir %attr(750,root,radiusd) /etc/raddb/mods-config/sql/cui/sqlite
-%attr(640,root,radiusd) %config(noreplace) /etc/raddb/mods-config/sql/cui/sqlite/*
-%dir %attr(750,root,radiusd) /etc/raddb/mods-config/sql/ippool-dhcp
-%dir %attr(750,root,radiusd) /etc/raddb/mods-config/sql/ippool-dhcp/sqlite
-%attr(640,root,radiusd) %config(noreplace) /etc/raddb/mods-config/sql/ippool-dhcp/sqlite/*
-%dir %attr(750,root,radiusd) /etc/raddb/mods-config/sql/ippool/sqlite
-%attr(640,root,radiusd) %config(noreplace) /etc/raddb/mods-config/sql/ippool/sqlite/*
-%dir %attr(750,root,radiusd) /etc/raddb/mods-config/sql/main/sqlite
-%attr(640,root,radiusd) %config(noreplace) /etc/raddb/mods-config/sql/main/sqlite/*
-%dir %attr(750,root,radiusd) /etc/raddb/mods-config/sql/moonshot-targeted-ids/sqlite
-%attr(640,root,radiusd) %config(noreplace) /etc/raddb/mods-config/sql/moonshot-targeted-ids/sqlite/*
+%dir %attr(750,root,radiusd) %{_sysconfdir}/raddb/mods-config/sql/counter/sqlite
+%attr(640,root,radiusd) %config(noreplace) %{_sysconfdir}/raddb/mods-config/sql/counter/sqlite/*
+%dir %attr(750,root,radiusd) %{_sysconfdir}/raddb/mods-config/sql/cui/sqlite
+%attr(640,root,radiusd) %config(noreplace) %{_sysconfdir}/raddb/mods-config/sql/cui/sqlite/*
+%dir %attr(750,root,radiusd) %{_sysconfdir}/raddb/mods-config/sql/ippool-dhcp
+%dir %attr(750,root,radiusd) %{_sysconfdir}/raddb/mods-config/sql/ippool-dhcp/sqlite
+%attr(640,root,radiusd) %config(noreplace) %{_sysconfdir}/raddb/mods-config/sql/ippool-dhcp/sqlite/*
+%dir %attr(750,root,radiusd) %{_sysconfdir}/raddb/mods-config/sql/ippool/sqlite
+%attr(640,root,radiusd) %config(noreplace) %{_sysconfdir}/raddb/mods-config/sql/ippool/sqlite/*
+%dir %attr(750,root,radiusd) %{_sysconfdir}/raddb/mods-config/sql/main/sqlite
+%attr(640,root,radiusd) %config(noreplace) %{_sysconfdir}/raddb/mods-config/sql/main/sqlite/*
+%dir %attr(750,root,radiusd) %{_sysconfdir}/raddb/mods-config/sql/moonshot-targeted-ids/sqlite
+%attr(640,root,radiusd) %config(noreplace) %{_sysconfdir}/raddb/mods-config/sql/moonshot-targeted-ids/sqlite/*
 # ruby
 %if %{?_with_rlm_ruby:1}%{!?_with_rlm_ruby:0}
-%dir %attr(750,root,radiusd) /etc/raddb/mods-config/ruby
-%attr(640,root,radiusd) %config(noreplace) /etc/raddb/mods-config/ruby/*
+%dir %attr(750,root,radiusd) %{_sysconfdir}/raddb/mods-config/ruby
+%attr(640,root,radiusd) %config(noreplace) %{_sysconfdir}/raddb/mods-config/ruby/*
 %endif
 # freetds
-%dir %attr(750,root,radiusd) /etc/raddb/mods-config/sql/main/mssql
-%attr(640,root,radiusd) %config(noreplace) /etc/raddb/mods-config/sql/main/mssql/*
+%dir %attr(750,root,radiusd) %{_sysconfdir}/raddb/mods-config/sql/main/mssql
+%attr(640,root,radiusd) %config(noreplace) %{_sysconfdir}/raddb/mods-config/sql/main/mssql/*
 # oracle
 %if %{?_with_rlm_sql_oracle:1}%{!?_with_rlm_sql_oracle:0}
-%dir %attr(750,root,radiusd) /etc/raddb/mods-config/sql
-%dir %attr(750,root,radiusd) /etc/raddb/mods-config/sql/ippool
-%dir %attr(750,root,radiusd) /etc/raddb/mods-config/sql/ippool/oracle
-%dir %attr(750,root,radiusd) /etc/raddb/mods-config/sql/ippool-dhcp
-%dir %attr(750,root,radiusd) /etc/raddb/mods-config/sql/ippool-dhcp/oracle
-%attr(640,root,radiusd) %config(noreplace) /etc/raddb/mods-config/sql/ippool/oracle/*
-%attr(640,root,radiusd) %config(noreplace) /etc/raddb/mods-config/sql/ippool-dhcp/oracle/*
-%dir %attr(750,root,radiusd) /etc/raddb/mods-config/sql/main
-%dir %attr(750,root,radiusd) /etc/raddb/mods-config/sql/main/oracle
-%attr(640,root,radiusd) %config(noreplace) /etc/raddb/mods-config/sql/main/oracle/*
+%dir %attr(750,root,radiusd) %{_sysconfdir}/raddb/mods-config/sql
+%dir %attr(750,root,radiusd) %{_sysconfdir}/raddb/mods-config/sql/ippool
+%dir %attr(750,root,radiusd) %{_sysconfdir}/raddb/mods-config/sql/ippool/oracle
+%dir %attr(750,root,radiusd) %{_sysconfdir}/raddb/mods-config/sql/ippool-dhcp
+%dir %attr(750,root,radiusd) %{_sysconfdir}/raddb/mods-config/sql/ippool-dhcp/oracle
+%attr(640,root,radiusd) %config(noreplace) %{_sysconfdir}/raddb/mods-config/sql/ippool/oracle/*
+%attr(640,root,radiusd) %config(noreplace) %{_sysconfdir}/raddb/mods-config/sql/ippool-dhcp/oracle/*
+%dir %attr(750,root,radiusd) %{_sysconfdir}/raddb/mods-config/sql/main
+%dir %attr(750,root,radiusd) %{_sysconfdir}/raddb/mods-config/sql/main/oracle
+%attr(640,root,radiusd) %config(noreplace) %{_sysconfdir}/raddb/mods-config/sql/main/oracle/*
 %endif
 
 %files utils

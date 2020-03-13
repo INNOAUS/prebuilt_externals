@@ -1468,7 +1468,7 @@ static ssize_t xlat_tokenize_literal(TALLOC_CTX *ctx, char *fmt, xlat_exp_t **he
 			ssize_t slen;
 			xlat_exp_t *next;
 
-			if (!p[1] || !strchr("%}dlmntDGHISTYv", p[1])) {
+			if (!p[1] || !strchr("%}delmntDGHIMSTYv", p[1])) {
 				talloc_free(node);
 				*error = "Invalid variable expansion";
 				p++;
@@ -1913,6 +1913,12 @@ static char *xlat_getvp(TALLOC_CTX *ctx, REQUEST *request, vp_tmpl_t const *vpt,
 				code = request->reply->code;
 			}
 
+		if (!code) return NULL;
+
+		if (code >= FR_MAX_PACKET_CODE) {
+			return talloc_typed_asprintf(ctx, "%d", packet->code);
+		}
+
 		return talloc_typed_strdup(ctx, fr_packet_codes[code]);
 	}
 
@@ -2131,6 +2137,12 @@ static char *xlat_aprint(TALLOC_CTX *ctx, REQUEST *request, xlat_exp_t const * c
 			strftime(str, freespace, "%d", &ts);
 			break;
 
+		case 'e': /* request second */
+			if (!localtime_r(&when, &ts)) goto error;
+
+			snprintf(str, freespace, "%d", ts.tm_sec);
+			break;
+
 		case 'l': /* request timestamp */
 			snprintf(str, freespace, "%lu",
 				 (unsigned long) when);
@@ -2170,6 +2182,10 @@ static char *xlat_aprint(TALLOC_CTX *ctx, REQUEST *request, xlat_exp_t const * c
 			if (request->packet) {
 				snprintf(str, freespace, "%i", request->packet->id);
 			}
+			break;
+
+		case 'M': /* request microsecond component */
+			snprintf(str, freespace, "%06u", (unsigned int) usec);
 			break;
 
 		case 'S': /* request timestamp in SQL format*/
@@ -2229,6 +2245,18 @@ static char *xlat_aprint(TALLOC_CTX *ctx, REQUEST *request, xlat_exp_t const * c
 		}
 		RDEBUG2("EXPAND %s", node->xlat->name);
 		RDEBUG2("   --> %s", str);
+
+		/*
+		 *	Resize the buffer to the correct size.
+		 */
+		if (rcode == 0) {
+			talloc_free(str);
+			str = talloc_strdup(ctx, "");
+		} else if (rcode < 2047) {
+			child = talloc_memdup(ctx, str, rcode + 1);
+			talloc_free(str);
+			str = child;
+		}
 		break;
 
 	case XLAT_MODULE:

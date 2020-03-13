@@ -607,13 +607,6 @@ int fr_pton(fr_ipaddr_t *out, char const *value, ssize_t inlen, int af, bool res
 			fr_strerror_printf("Invalid address");
 			return -1;
 		}
-
-		/*
-		 *	Fall through to resolving the address, using
-		 *	whatever address family they prefer.  If they
-		 *	don't specify an address family, force IPv4.
-		 */
-		if (af == AF_UNSPEC) af = AF_INET;
 	}
 
 	/*
@@ -815,10 +808,10 @@ int rad_unlockfd(int fd, int lock_len)
 	fl.l_start = 0;
 	fl.l_len = lock_len;
 	fl.l_pid = getpid();
-	fl.l_type = F_WRLCK;
+	fl.l_type = F_UNLCK;
 	fl.l_whence = SEEK_CUR;
 
-	return fcntl(fd, F_UNLCK, (void *)&fl);
+	return fcntl(fd, F_SETLK, (void *)&fl);
 #else
 #error "missing definition for F_WRLCK, all file locks will fail"
 
@@ -1411,7 +1404,8 @@ bool is_whitespace(char const *value)
 {
 	do {
 		if (!isspace(*value)) return false;
-	} while (*++value);
+		value++;
+	} while (*value);
 
 	return true;
 }
@@ -1446,9 +1440,21 @@ bool is_whitespace(char const *value)
  */
 bool is_integer(char const *value)
 {
+#ifndef __clang_analyzer__
 	do {
 		if (!isdigit(*value)) return false;
-	} while (*++value);
+		value++;
+	} while (*value);
+
+	/*
+	 *	Clang analyzer complains about the above line: "Branch
+	 *	depends on a garbage value", even though that's
+	 *	clearly not true.  And, it doesn't complain about the
+	 *	other functions doing similar things.
+	 */
+#else
+	if (!isdigit(*value)) return false;
+#endif
 
 	return true;
 }
@@ -1461,7 +1467,8 @@ bool is_zero(char const *value)
 {
 	do {
 		if (*value != '0') return false;
-	} while (*++value);
+		value++;
+	} while (*value);
 
 	return true;
 }
@@ -2145,6 +2152,30 @@ void fr_quick_sort(void const *to_sort[], int min_idx, int max_idx, fr_cmp_t cmp
 	part = _quick_partition(to_sort, min_idx, max_idx, cmp);
 	fr_quick_sort(to_sort, min_idx, part - 1, cmp);
 	fr_quick_sort(to_sort, part + 1, max_idx, cmp);
+}
+
+#define USEC 1000000
+
+/** Convert a time specified in milliseconds to a timeval
+ *
+ * @param[out] out	Where to write the result.
+ * @param[in] ms	To convert to a timeval struct.
+ */
+void fr_timeval_from_ms(struct timeval *out, uint64_t ms)
+{
+	out->tv_sec = ms / 1000;
+	out->tv_usec = (ms % 1000) * 1000;
+}
+
+/** Convert a time specified in microseconds to a timeval
+ *
+ * @param[out] out	Where to write the result.
+ * @param[in] usec	To convert to a timeval struct.
+ */
+void fr_timeval_from_usec(struct timeval *out, uint64_t usec)
+{
+	out->tv_sec = usec / USEC;
+	out->tv_usec = usec % USEC;
 }
 
 #ifdef TALLOC_DEBUG

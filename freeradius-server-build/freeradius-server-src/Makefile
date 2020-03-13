@@ -8,6 +8,11 @@
 #
 
 #
+#	we didn't called ./configure? just define the version.
+#
+RADIUSD_VERSION_STRING := $(shell cat VERSION)
+
+#
 #  The default rule is "all".
 #
 all:
@@ -27,9 +32,11 @@ endif
 #  the debian packages.
 #
 ifneq "$(MAKECMDGOALS)" "deb"
+ifneq "$(MAKECMDGOALS)" "rpm"
 $(if $(wildcard Make.inc),,$(error Missing 'Make.inc' Run './configure [options]' and retry))
 
 include Make.inc
+endif
 endif
 
 MFLAGS += --no-print-directory
@@ -44,7 +51,9 @@ export DESTDIR := $(R)
 
 # And over-ride all of the other magic.
 ifneq "$(MAKECMDGOALS)" "deb"
+ifneq "$(MAKECMDGOALS)" "rpm"
 include scripts/boiler.mk
+endif
 endif
 
 #
@@ -80,14 +89,13 @@ test: ${BUILD_DIR}/bin/radiusd ${BUILD_DIR}/bin/radclient tests.unit tests.xlat 
 
 #  Tests specifically for Travis.  We do a LOT more than just
 #  the above tests
-ifneq "$(findstring travis,${prefix})" ""
 travis-test: raddb/test.conf test
 	@FR_LIBRARY_PATH=./build/lib/local/.libs/ ./build/make/jlibtool --mode=execute ./build/bin/radiusd -xxxv -n test
 	@rm -f raddb/test.conf
 	@$(MAKE) install
 	@perl -p -i -e 's/allow_vulnerable_openssl = no/allow_vulnerable_openssl = yes/' ${raddbdir}/radiusd.conf
+	@sh ${HOME}/freeradius/etc/raddb/certs
 	@${sbindir}/radiusd -XC
-endif
 
 #
 # The $(R) is a magic variable not defined anywhere in this source.
@@ -116,9 +124,14 @@ $(R)$(dictdir)/%: share/%
 	@$(INSTALL) -m 644 $< $@
 
 MANFILES := $(wildcard man/man*/*.?)
+MANDIR   := $(wildcard man/man*)
 install.man: $(subst man/,$(R)$(mandir)/,$(MANFILES))
 
-$(R)$(mandir)/%: man/%
+$(MANDIR):
+	@echo INSTALL $(patsubst $(R)$(mandir)/%,man/%,$@)
+	@$(INSTALL) -d -m 755 $@
+
+$(R)$(mandir)/%: man/% | $(dir $@)
 	@echo INSTALL $(notdir $<)
 	@sed -e "s,/etc/raddb,$(raddbdir),g" \
 		-e "s,/usr/local/share,$(datarootdir),g" \
@@ -306,7 +319,7 @@ dist-tag: freeradius-server-$(RADIUSD_VERSION_STRING).tar.gz freeradius-server-$
 #
 .PHONY: docker
 docker:
-	docker build scripts/docker/ubuntu16 --build-arg=release=release_`echo $(RADIUSD_VERSION_STRING) | tr .- __` -t freeradius/freeradius-server:$(RADIUSD_VERSION_STRING)
+	docker build scripts/docker/ubuntu18 --build-arg=release=release_`echo $(RADIUSD_VERSION_STRING) | tr .- __` -t freeradius/freeradius-server:$(RADIUSD_VERSION_STRING)
 	docker build scripts/docker/alpine --build-arg=release=release_`echo $(RADIUSD_VERSION_STRING) | tr .- __` -t freeradius/freeradius-server:$(RADIUSD_VERSION_STRING)-alpine
 
 .PHONY: docker-push
@@ -317,10 +330,12 @@ docker-push: docker
 .PHONY: docker-tag-latest
 docker-tag-latest: docker
 	docker tag freeradius/freeradius-server:$(RADIUSD_VERSION_STRING) freeradius/freeradius-server:latest
+	docker tag freeradius/freeradius-server:$(RADIUSD_VERSION_STRING)-alpine freeradius/freeradius-server:latest-alpine
 
 .PHONY: docker-push-latest
 docker-push-latest: docker-push docker-tag-latest
 	docker push freeradius/freeradius-server:latest
+	docker push freeradius/freeradius-server:latest-alpine
 
 .PHONY: docker-publish
 docker-publish: docker-push-latest
@@ -330,7 +345,24 @@ docker-publish: docker-push-latest
 #
 .PHONY: deb
 deb:
+	fakeroot debian/rules debian/control #clean
 	fakeroot dpkg-buildpackage -b -uc
+
+#
+#	Build a rpm package
+#
+.PHONY: rpm
+rpmbuild/SOURCES/freeradius-server-$(RADIUSD_VERSION_STRING).tar.bz2: freeradius-server-$(RADIUSD_VERSION_STRING).tar.bz2
+	@mkdir -p $(addprefix rpmbuild/,SOURCES SPECS BUILD RPMS SRPMS BUILDROOT)
+	@for file in `awk '/^Source...:/ {print $$2}' redhat/freeradius.spec` ; do cp redhat/$$file rpmbuild/SOURCES/$$file ; done
+	@cp $< $@
+
+rpm: rpmbuild/SOURCES/freeradius-server-$(RADIUSD_VERSION_STRING).tar.bz2
+	@if ! yum-builddep -q -C --assumeno redhat/freeradius.spec 1> /dev/null 2>&1; then \
+		echo "ERROR: Required depdendencies not found, install them with: yum-builddep redhat/freeradius.spec"; \
+		exit 1; \
+	fi
+	@QA_RPATHS=0x0003 rpmbuild --define "_topdir `pwd`/rpmbuild" -bb redhat/freeradius.spec
 
 # Developer checks
 .PHONY: warnings
