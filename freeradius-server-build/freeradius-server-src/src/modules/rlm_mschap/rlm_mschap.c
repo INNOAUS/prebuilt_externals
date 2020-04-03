@@ -1156,28 +1156,63 @@ static int CC_HINT(nonnull (1, 2, 4, 5 ,6)) do_mschap(rlm_mschap_t *inst, REQUES
 			char *p;
 
 			/*
-			 *	look for "Password expired", or "Must change password".
+			 *	Do checks for numbers, which are
+			 *	language neutral.  They're also
+			 *	faster.
 			 */
-			if (strcasestr(buffer, "Password expired") ||
+			p = strcasestr(buffer, "0xC0000");
+			if (p) {
+				int rcode = 0;
+
+				p += 7;
+				if (strcmp(p, "224") == 0) {
+					rcode = -648;
+
+				} else if (strcmp(p, "234") == 0) {
+					rcode = -647;
+
+				} else if (strcmp(p, "072") == 0) {
+					rcode = -691;
+
+				} else if (strcasecmp(p, "05E") == 0) {
+					rcode = -2;
+				}
+
+				if (rcode != 0) {
+					REDEBUG2("%s", buffer);
+					return rcode;
+				}
+
+				/*
+				 *	Else fall through to more ridiculous checks.
+				 */
+			}
+
+			/*
+			 *	Look for variants of expire password.
+			 */
+			if (strcasestr(buffer, "0xC0000224") ||
+			    strcasestr(buffer, "Password expired") ||
+			    strcasestr(buffer, "Password has expired") ||
+			    strcasestr(buffer, "Password must be changed") ||
 			    strcasestr(buffer, "Must change password")) {
-				REDEBUG2("%s", buffer);
 				return -648;
 			}
 
-			if (strcasestr(buffer, "Account locked out") ||
-			    strcasestr(buffer, "0xC0000234")) {
+			if (strcasestr(buffer, "0xC0000234") ||
+			    strcasestr(buffer, "Account locked out")) {
 				REDEBUG2("%s", buffer);
 				return -647;
 			}
 
-			if (strcasestr(buffer, "Account disabled") ||
-			    strcasestr(buffer, "0xC0000072")) {
+			if (strcasestr(buffer, "0xC0000072") ||
+			    strcasestr(buffer, "Account disabled")) {
 				REDEBUG2("%s", buffer);
 				return -691;
 			}
 
-			if (strcasestr(buffer, "No logon servers") ||
-			    strcasestr(buffer, "0xC000005E")) {
+			if (strcasestr(buffer, "0xC000005E") ||
+			    strcasestr(buffer, "No logon servers")) {
 				REDEBUG2("%s", buffer);
 				return -2;
 			}
@@ -1520,7 +1555,7 @@ static rlm_rcode_t CC_HINT(nonnull) mod_authenticate(void *instance, REQUEST *re
 	VALUE_PAIR *response = NULL;
 	VALUE_PAIR *cpw = NULL;
 	VALUE_PAIR *password = NULL;
-	VALUE_PAIR *lm_password, *nt_password, *smb_ctrl;
+	VALUE_PAIR *nt_password, *smb_ctrl;
 	VALUE_PAIR *username;
 	uint8_t nthashhash[NT_DIGEST_LENGTH];
 	char msch2resp[42];
@@ -1628,57 +1663,6 @@ static rlm_rcode_t CC_HINT(nonnull) mod_authenticate(void *instance, REQUEST *re
 			}
 		} else if (auth_method == AUTH_INTERNAL) {
 			RWDEBUG2("No Cleartext-Password configured.  Cannot create NT-Password");
-		}
-	}
-
-	/*
-	 *	Or an LM-Password.
-	 */
-	lm_password = fr_pair_find_by_num(request->config, PW_LM_PASSWORD, 0, TAG_ANY);
-	if (lm_password) {
-		VERIFY_VP(lm_password);
-
-		switch (lm_password->vp_length) {
-		case LM_DIGEST_LENGTH:
-			RDEBUG2("Found LM-Password");
-			break;
-
-		/* 0x */
-		case 34:
-		case 32:
-			RWDEBUG("LM-Password has not been normalized by the 'pap' module (likely still in hex format).  "
-				"Authentication may fail");
-			lm_password = NULL;
-			break;
-
-		default:
-			RWDEBUG("LM-Password found but incorrect length, expected " STRINGIFY(LM_DIGEST_LENGTH)
-				" bytes got %zu bytes.  Authentication may fail", lm_password->vp_length);
-			lm_password = NULL;
-			break;
-		}
-	}
-	/*
-	 *	... or a Cleartext-Password, which we now transform into an LM-Password
-	 */
-	if (!lm_password) {
-		if (password) {
-			RDEBUG2("Found Cleartext-Password, hashing to create LM-Password");
-			lm_password = pair_make_config("LM-Password", NULL, T_OP_EQ);
-			if (!lm_password) {
-				RERROR("No memory");
-			} else {
-				uint8_t *p;
-
-				lm_password->vp_length = LM_DIGEST_LENGTH;
-				lm_password->vp_octets = p = talloc_array(lm_password, uint8_t, lm_password->vp_length);
-				smbdes_lmpwdhash(password->vp_strvalue, p);
-			}
-		/*
-		 *	Only complain if we don't have NT-Password
-		 */
-		} else if ((auth_method == AUTH_INTERNAL) && !nt_password) {
-			RWDEBUG2("No Cleartext-Password configured.  Cannot create LM-Password");
 		}
 	}
 
@@ -1868,9 +1852,8 @@ static rlm_rcode_t CC_HINT(nonnull) mod_authenticate(void *instance, REQUEST *re
 			password = nt_password;
 			offset = 26;
 		} else {
-			RDEBUG2("Client is using MS-CHAPv1 with LM-Password");
-			password = lm_password;
-			offset = 2;
+			REDEBUG2("Client is using MS-CHAPv1 with unsupported method LM-Password");
+			return RLM_MODULE_FAIL;
 		}
 
 		/*
@@ -1941,7 +1924,7 @@ static rlm_rcode_t CC_HINT(nonnull) mod_authenticate(void *instance, REQUEST *re
 			if (inst->with_ntdomain_hack) {
 				username_string++;
 			} else {
-				RWDEBUG2("NT Domain delimeter found, should with_ntdomain_hack of been enabled?");
+				RWDEBUG2("NT Domain delimiter found, should with_ntdomain_hack of been enabled?");
 				username_string = name_attr->vp_strvalue;
 			}
 		} else {
@@ -1959,8 +1942,8 @@ static rlm_rcode_t CC_HINT(nonnull) mod_authenticate(void *instance, REQUEST *re
 		 *  No "known good" NT-Password attribute.  Try to do
 		 *  OpenDirectory authentication.
 		 *
-		 *  If OD determines the user is an AD user it will return noop, which
-		 *  indicates the auth process should continue directly to AD.
+		 *  If OD determines the user is an OD user it will return noop, which
+		 *  indicates the auth process should continue directly to OD.
 		 *  Otherwise OD will determine auth success/fail.
 		 */
 		if (!nt_password && inst->open_directory) {
@@ -2031,9 +2014,6 @@ static rlm_rcode_t CC_HINT(nonnull) mod_authenticate(void *instance, REQUEST *re
 		if (mschap_version == 1) {
 			RDEBUG2("adding MS-CHAPv1 MPPE keys");
 			memset(mppe_sendkey, 0, 32);
-			if (lm_password) {
-				memcpy(mppe_sendkey, lm_password->vp_octets, 8);
-			}
 
 			/*
 			 *	According to RFC 2548 we

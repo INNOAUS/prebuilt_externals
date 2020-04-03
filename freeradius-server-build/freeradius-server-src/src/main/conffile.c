@@ -139,7 +139,7 @@ static char const 	*cf_expand_variables(char const *cf, int *lineno,
 					     char *output, size_t outsize,
 					     char const *input, bool *soft_fail);
 
-static int cf_file_include(CONF_SECTION *cs, char const *filename_in);
+static int cf_file_include(CONF_SECTION *cs, char const *filename_in, bool from_dir);
 
 
 
@@ -300,7 +300,7 @@ static int filename_cmp(void const *a, void const *b)
 	return 0;
 }
 
-static FILE *cf_file_open(CONF_SECTION *cs, char const *filename)
+static int cf_file_open(CONF_SECTION *cs, char const *filename, bool from_dir, FILE **fp_p)
 {
 	cf_file_t *file;
 	CONF_DATA *cd;
@@ -311,15 +311,35 @@ static FILE *cf_file_open(CONF_SECTION *cs, char const *filename)
 
 	top = cf_top_section(cs);
 	cd = cf_data_find_internal(top, "filename", 0);
-	if (!cd) return NULL;
+	if (!cd) return -1;
 
 	tree = cd->data;
 
+	/*
+	 *	If we're including a wildcard directory, then ignore
+	 *	any files the users has already explicitly loaded in
+	 *	that directory.
+	 */
+	if (from_dir) {
+		cf_file_t my_file;
+
+		my_file.cs = cs;
+		my_file.filename = filename;
+
+		if (stat(filename, &my_file.buf) < 0) goto error;
+
+		file = rbtree_finddata(tree, &my_file);
+		if (file) return 0;
+	}
+
+	DEBUG2("including configuration file %s", filename);
+
 	fp = fopen(filename, "r");
 	if (!fp) {
+error:
 		ERROR("Unable to open file \"%s\": %s",
 		      filename, fr_syserror(errno));
-		return NULL;
+		return -1;
 	}
 
 	fd = fileno(fp);
@@ -327,7 +347,7 @@ static FILE *cf_file_open(CONF_SECTION *cs, char const *filename)
 	file = talloc(tree, cf_file_t);
 	if (!file) {
 		fclose(fp);
-		return NULL;
+		return -1;
 	}
 
 	file->filename = filename;
@@ -341,7 +361,7 @@ static FILE *cf_file_open(CONF_SECTION *cs, char const *filename)
 
 			fclose(fp);
 			talloc_free(file);
-			return NULL;
+			return -1;
 		}
 #endif
 	}
@@ -356,7 +376,8 @@ static FILE *cf_file_open(CONF_SECTION *cs, char const *filename)
 		talloc_free(file);
 	}
 
-	return fp;
+	*fp_p = fp;
+	return 1;
 }
 
 /*
@@ -440,8 +461,7 @@ static int file_callback(void *ctx, void *data)
 	/*
 	 *	The file changed, we'll need to re-read it.
 	 */
-	if (buf.st_mtime != file->buf.st_mtime) {
-
+	if (file->buf.st_mtime != buf.st_mtime) {
 		if (cb->callback(cb->modules, file->cs)) {
 			cb->rcode |= CF_FILE_MODULE;
 			DEBUG3("HUP: Changed module file %s", file->filename);
@@ -449,6 +469,12 @@ static int file_callback(void *ctx, void *data)
 			DEBUG3("HUP: Changed config file %s", file->filename);
 			cb->rcode |= CF_FILE_CONFIG;
 		}
+
+		/*
+		 *	Presume that the file will be immediately
+		 *	re-read, so we update the mtime appropriately.
+		 */
+		file->buf.st_mtime = buf.st_mtime;
 	}
 
 	return 0;
@@ -1067,7 +1093,7 @@ static char const *cf_expand_variables(char const *cf, int *lineno,
 			end = strchr(ptr, '}');
 			if (end == NULL) {
 				*p = '\0';
-				INFO("%s[%d]: Variable expansion missing }",
+				ERROR("%s[%d]: Variable expansion missing }",
 				       cf, *lineno);
 				return NULL;
 			}
@@ -1212,7 +1238,7 @@ static char const *cf_expand_variables(char const *cf, int *lineno,
 			end = strchr(ptr, '}');
 			if (end == NULL) {
 				*p = '\0';
-				INFO("%s[%d]: Environment variable expansion missing }",
+				ERROR("%s[%d]: Environment variable expansion missing }",
 				       cf, *lineno);
 				return NULL;
 			}
@@ -1295,29 +1321,32 @@ static inline int fr_item_validate_ipaddr(CONF_SECTION *cs, char const *name, PW
 	case PW_TYPE_COMBO_IP_ADDR:
 		switch (ipaddr->af) {
 		case AF_INET:
-		if (ipaddr->prefix != 32) {
-			ERROR("Invalid IPv4 mask length \"/%i\".  Only \"/32\" permitted for non-prefix types",
-			      ipaddr->prefix);
+			if (ipaddr->prefix == 32) return 0;
 
-			return -1;
-		}
+			cf_log_err(&(cs->item), "Invalid IPv4 mask length \"/%i\".  Only \"/32\" permitted for non-prefix types",
+				   ipaddr->prefix);
 			break;
 
 		case AF_INET6:
-		if (ipaddr->prefix != 128) {
-			ERROR("Invalid IPv6 mask length \"/%i\".  Only \"/128\" permitted for non-prefix types",
-			      ipaddr->prefix);
+			if (ipaddr->prefix == 128) return 0;
 
-			return -1;
-		}
+			cf_log_err(&(cs->item), "Invalid IPv6 mask length \"/%i\".  Only \"/128\" permitted for non-prefix types",
+				   ipaddr->prefix);
 			break;
 
+
 		default:
-			return -1;
+			cf_log_err(&(cs->item), "Unknown address (%d) family passed for parsing IP address.", ipaddr->af);
+			break;
 		}
+
+		return -1;
+
 	default:
-		return 0;
+		break;
 	}
+
+	return 0;
 }
 
 /** Parses a #CONF_PAIR into a C data type, with a default value.
@@ -1395,7 +1424,10 @@ int cf_item_parse(CONF_SECTION *cs, char const *name, unsigned int type, void *d
 	char buffer[8192];
 	CONF_ITEM *c_item;
 
-	if (!cs) return -1;
+	if (!cs) {
+		cf_log_err(&(cs->item), "No enclosing section for configuration item \"%s\"", name);
+		return -1;
+	}
 
 	c_item = &cs->item;
 
@@ -1654,10 +1686,12 @@ int cf_item_parse(CONF_SECTION *cs, char const *name, unsigned int type, void *d
 		 *	server startup.
 		 */
 		if (*q && file_input && !cf_file_check(cs, *q, true)) {
+			cf_log_err(&(cs->item), "Failed parsing configuration item \"%s\"", name);
 			return -1;
 		}
 
 		if (*q && file_exists && !cf_file_check(cs, *q, false)) {
+			cf_log_err(&(cs->item), "Failed parsing configuration item \"%s\"", name);
 			return -1;
 		}
 		break;
@@ -1667,7 +1701,8 @@ int cf_item_parse(CONF_SECTION *cs, char const *name, unsigned int type, void *d
 		ipaddr = data;
 
 		if (fr_pton4(ipaddr, value, -1, true, false) < 0) {
-			ERROR("%s", fr_strerror());
+		failed:
+			cf_log_err(&(cs->item), "Failed parsing configuration item \"%s\" - %s", name, fr_strerror());
 			return -1;
 		}
 		if (fr_item_validate_ipaddr(cs, name, type, value, ipaddr) < 0) return -1;
@@ -1677,10 +1712,7 @@ int cf_item_parse(CONF_SECTION *cs, char const *name, unsigned int type, void *d
 	case PW_TYPE_IPV6_PREFIX:
 		ipaddr = data;
 
-		if (fr_pton6(ipaddr, value, -1, true, false) < 0) {
-			ERROR("%s", fr_strerror());
-			return -1;
-		}
+		if (fr_pton6(ipaddr, value, -1, true, false) < 0) goto failed;
 		if (fr_item_validate_ipaddr(cs, name, type, value, ipaddr) < 0) return -1;
 		break;
 
@@ -1688,10 +1720,7 @@ int cf_item_parse(CONF_SECTION *cs, char const *name, unsigned int type, void *d
 	case PW_TYPE_COMBO_IP_PREFIX:
 		ipaddr = data;
 
-		if (fr_pton(ipaddr, value, -1, AF_UNSPEC, true) < 0) {
-			ERROR("%s", fr_strerror());
-			return -1;
-		}
+		if (fr_pton(ipaddr, value, -1, AF_UNSPEC, true) < 0) goto failed;
 		if (fr_item_validate_ipaddr(cs, name, type, value, ipaddr) < 0) return -1;
 		break;
 
@@ -1709,7 +1738,7 @@ int cf_item_parse(CONF_SECTION *cs, char const *name, unsigned int type, void *d
 			len = strlen(end + 1);
 
 			if (len > 6) {
-				ERROR("Too much precision for timeval");
+				cf_log_err(&(cs->item), "Too much precision for timeval");
 				return -1;
 			}
 
@@ -1740,7 +1769,7 @@ int cf_item_parse(CONF_SECTION *cs, char const *name, unsigned int type, void *d
 		rad_assert(type > PW_TYPE_INVALID);
 		rad_assert(type < PW_TYPE_MAX);
 
-		ERROR("type '%s' is not supported in the configuration files",
+		cf_log_err(&(cs->item), "type '%s' is not supported in the configuration files",
 		       fr_int2str(dict_attr_types, type, "?Unknown?"));
 		return -1;
 	} /* switch over variable type */
@@ -2501,11 +2530,12 @@ static int cf_section_read(char const *filename, int *lineno, FILE *fp,
 						 value, dp->d_name);
 					if ((stat(buf2, &stat_buf) != 0) ||
 					    S_ISDIR(stat_buf.st_mode)) continue;
+
 					/*
 					 *	Read the file into the current
 					 *	configuration section.
 					 */
-					if (cf_file_include(this, buf2) < 0) {
+					if (cf_file_include(this, buf2, true) < 0) {
 						closedir(dir);
 						return -1;
 					}
@@ -2523,7 +2553,7 @@ static int cf_section_read(char const *filename, int *lineno, FILE *fp,
 					}
 				}
 
-				if (cf_file_include(this, value) < 0) {
+				if (cf_file_include(this, value, false) < 0) {
 					return -1;
 				}
 			}
@@ -2958,9 +2988,10 @@ static int cf_section_read(char const *filename, int *lineno, FILE *fp,
 /*
  *	Include one config file in another.
  */
-static int cf_file_include(CONF_SECTION *cs, char const *filename_in)
+static int cf_file_include(CONF_SECTION *cs, char const *filename_in, bool from_dir)
 {
 	FILE		*fp;
+	int		rcode;
 	int		lineno = 0;
 	char const	*filename;
 
@@ -2969,10 +3000,11 @@ static int cf_file_include(CONF_SECTION *cs, char const *filename_in)
 	 */
 	filename = talloc_strdup(cs, filename_in);
 
-	DEBUG2("including configuration file %s", filename);
-
-	fp = cf_file_open(cs, filename);
-	if (!fp) return -1;
+	/*
+	 *	This may return "0" if we already loaded the file.
+	 */
+	rcode = cf_file_open(cs, filename, from_dir, &fp);
+	if (rcode <= 0) return rcode;
 
 	if (!cs->item.filename) cs->item.filename = filename;
 
@@ -3054,7 +3086,7 @@ int cf_file_read(CONF_SECTION *cs, char const *filename)
 
 	cf_data_add_internal(cs, "filename", tree, NULL, 0);
 
-	if (cf_file_include(cs, filename) < 0) return -1;
+	if (cf_file_include(cs, filename, false) < 0) return -1;
 
 	/*
 	 *	Now that we've read the file, go back through it and

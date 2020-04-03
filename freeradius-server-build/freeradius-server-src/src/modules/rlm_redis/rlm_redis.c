@@ -73,6 +73,10 @@ static void *mod_conn_create(TALLOC_CTX *ctx, void *instance)
 		return NULL;
 	}
 
+#ifndef redisReplyReaderGetError
+#define redisReplyReaderGetError redisReaderGetError
+#endif
+
 	if (conn && conn->err) {
 		ERROR("rlm_redis (%s): Problems with redisConnectWithTimeout('%s', %d, %d), %s",
 				inst->xlat_name, inst->hostname, inst->port, inst->query_timeout, redisReplyReaderGetError(conn));
@@ -237,6 +241,12 @@ int rlm_redis_query(REDISSOCK **dissocket_p, REDIS_INST *inst,
 				sizeof(argv_buf), argv_buf);
 	if (argc <= 0)
 		return -1;
+
+	if (argc >= (MAX_REDIS_ARGS - 1)) {
+		RERROR("rlm_redis (%s): query has too many parameters; increase "
+				"MAX_REDIS_ARGS and recompile", inst->xlat_name);
+		return -1;
+	}
 
 	dissocket = *dissocket_p;
 

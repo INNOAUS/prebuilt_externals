@@ -55,48 +55,12 @@ static int		tree_num_max = 0;
 #endif
 static RADCLIENT_LIST	*root_clients = NULL;
 
-#ifdef WITH_DYNAMIC_CLIENTS
-static fr_fifo_t	*deleted_clients = NULL;
-#endif
-
 /*
  *	Callback for freeing a client.
  */
 void client_free(RADCLIENT *client)
 {
 	if (!client) return;
-
-#ifdef WITH_DYNAMIC_CLIENTS
-	if (client->dynamic == 2) {
-		time_t now;
-
-		if (!deleted_clients) {
-			deleted_clients = fr_fifo_create(NULL, 1024, (void (*)(void *))client_free);
-			if (!deleted_clients) return; /* MEMLEAK */
-		}
-
-		/*
-		 *	Mark it as in the fifo, and remember when we
-		 *	pushed it.
-		 */
-		client->dynamic = 3;
-		client->created = now = time(NULL); /* re-set it */
-		fr_fifo_push(deleted_clients, client);
-
-		/*
-		 *	Peek at the head of the fifo.  If it might
-		 *	still be in use, return.  Otherwise, pop it
-		 *	from the queue and delete it.
-		 */
-		client = fr_fifo_peek(deleted_clients);
-		rad_assert(client != NULL);
-
-		if ((client->created + 120) >= now) return;
-
-		client = fr_fifo_pop(deleted_clients);
-		rad_assert(client != NULL);
-	}
-#endif
 
 	talloc_free(client);
 }
@@ -322,6 +286,7 @@ bool client_add(RADCLIENT_LIST *clients, RADCLIENT *client)
 		}
 
 		ERROR("Failed to add duplicate client %s", client->shortname);
+		client_free(client);
 		return false;
 	}
 #undef namecmp
@@ -330,6 +295,7 @@ bool client_add(RADCLIENT_LIST *clients, RADCLIENT *client)
 	 *	Other error adding client: likely is fatal.
 	 */
 	if (!rbtree_insert(clients->trees[client->ipaddr.prefix], client)) {
+		client_free(client);
 		return false;
 	}
 
@@ -385,8 +351,6 @@ void client_delete(RADCLIENT_LIST *clients, RADCLIENT *client)
 	if (!client->dynamic) return;
 
 	rad_assert(client->ipaddr.prefix <= 128);
-
-	client->dynamic = 2;	/* signal to client_free */
 
 #ifdef WITH_STATS
 	rbtree_deletebydata(tree_num, client);
@@ -1217,6 +1181,14 @@ RADCLIENT *client_afrom_request(RADCLIENT_LIST *clients, REQUEST *request)
 
 	if (!clients || !request) return NULL;
 
+	/*
+	 *	Hack for the "dynamic_clients" module.
+	 */
+	if (request->client->dynamic) {
+		c = request->client;
+		goto validate;
+	}
+
 	snprintf(buffer, sizeof(buffer), "dynamic%i", cnt++);
 
 	c = talloc_zero(clients, RADCLIENT);
@@ -1428,6 +1400,7 @@ RADCLIENT *client_afrom_request(RADCLIENT_LIST *clients, REQUEST *request)
 	}
 	REXDENT();
 
+validate:
 	if (c->ipaddr.af == AF_UNSPEC) {
 		RERROR("Cannot add client %s: No IP address was specified.",
 		       ip_ntoh(&request->packet->src_ipaddr, buffer, sizeof(buffer)));

@@ -38,6 +38,10 @@ RCSID("$Id$")
 #  include <sys/stat.h>
 #endif
 
+#ifndef READLINE_MAX_HISTORY_LINES
+#	define READLINE_MAX_HISTORY_LINES 1000
+#endif
+
 #ifdef HAVE_LIBREADLINE
 
 # include <stdio.h>
@@ -339,6 +343,9 @@ int main(int argc, char **argv)
 
 	char const	*radius_dir = RADIUS_DIR;
 	char const	*dict_dir = DICTDIR;
+#ifdef USE_READLINE_HISTORY
+	char 		history_file[PATH_MAX];
+#endif
 
 	char *commands[MAX_COMMANDS];
 	int num_commands = -1;
@@ -403,6 +410,10 @@ int main(int argc, char **argv)
 			usage(0);	/* never returns */
 
 		case 'i':
+#ifdef __clang_analyzer__
+			if (!optarg) exit(1);
+#endif
+
 			if (strcmp(optarg, "-") != 0) {
 				input_file = optarg;
 			}
@@ -578,6 +589,10 @@ int main(int argc, char **argv)
 	if (!quiet) {
 #ifdef USE_READLINE_HISTORY
 		using_history();
+		stifle_history(READLINE_MAX_HISTORY_LINES);
+
+		snprintf(history_file, sizeof(history_file), "%s/%s", getenv("HOME"), ".radmin_history");
+		read_history(history_file);
 #endif
 		rl_bind_key('\t', rl_insert);
 	}
@@ -607,7 +622,7 @@ int main(int argc, char **argv)
 
 	if (!quiet) {
 		printf("%s - FreeRADIUS Server administration tool.\n", radmin_version);
-		printf("Copyright (C) 2008-2017 The FreeRADIUS server project and contributors.\n");
+		printf("Copyright (C) 2008-2019 The FreeRADIUS server project and contributors.\n");
 		printf("There is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A\n");
 		printf("PARTICULAR PURPOSE.\n");
 		printf("You may redistribute copies of FreeRADIUS under the terms of the\n");
@@ -639,6 +654,7 @@ int main(int argc, char **argv)
 
 #ifdef USE_READLINE_HISTORY
 			add_history(line);
+			write_history(history_file);
 #endif
 		} else		/* quiet, or no readline */
 #endif
@@ -696,7 +712,7 @@ int main(int argc, char **argv)
 			continue;
 		}
 
-		if (memcmp(line, "secret ", 7) == 0) {
+		if (strncmp(line, "secret ", 7) == 0) {
 			if (!secret) {
 				secret = line + 7;
 				do_challenge(sockfd);
