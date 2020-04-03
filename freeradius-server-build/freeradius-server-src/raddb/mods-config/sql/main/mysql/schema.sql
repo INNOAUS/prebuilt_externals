@@ -14,7 +14,7 @@
 # Table structure for table 'radacct'
 #
 
-CREATE TABLE radacct (
+CREATE TABLE IF NOT EXISTS radacct (
   radacctid bigint(21) NOT NULL auto_increment,
   acctsessionid varchar(64) NOT NULL default '',
   acctuniqueid varchar(32) NOT NULL default '',
@@ -39,10 +39,18 @@ CREATE TABLE radacct (
   servicetype varchar(32) default NULL,
   framedprotocol varchar(32) default NULL,
   framedipaddress varchar(15) NOT NULL default '',
+  framedipv6address varchar(45) NOT NULL default '',
+  framedipv6prefix varchar(45) NOT NULL default '',
+  framedinterfaceid varchar(44) NOT NULL default '',
+  delegatedipv6prefix varchar(45) NOT NULL default '',
   PRIMARY KEY (radacctid),
   UNIQUE KEY acctuniqueid (acctuniqueid),
   KEY username (username),
   KEY framedipaddress (framedipaddress),
+  KEY framedipv6address (framedipv6address),
+  KEY framedipv6prefix (framedipv6prefix),
+  KEY framedinterfaceid (framedinterfaceid),
+  KEY delegatedipv6prefix (delegatedipv6prefix),
   KEY acctsessionid (acctsessionid),
   KEY acctsessiontime (acctsessiontime),
   KEY acctstarttime (acctstarttime),
@@ -55,7 +63,7 @@ CREATE TABLE radacct (
 # Table structure for table 'radcheck'
 #
 
-CREATE TABLE radcheck (
+CREATE TABLE IF NOT EXISTS radcheck (
   id int(11) unsigned NOT NULL auto_increment,
   username varchar(64) NOT NULL default '',
   attribute varchar(64)  NOT NULL default '',
@@ -69,7 +77,7 @@ CREATE TABLE radcheck (
 # Table structure for table 'radgroupcheck'
 #
 
-CREATE TABLE radgroupcheck (
+CREATE TABLE IF NOT EXISTS radgroupcheck (
   id int(11) unsigned NOT NULL auto_increment,
   groupname varchar(64) NOT NULL default '',
   attribute varchar(64)  NOT NULL default '',
@@ -83,7 +91,7 @@ CREATE TABLE radgroupcheck (
 # Table structure for table 'radgroupreply'
 #
 
-CREATE TABLE radgroupreply (
+CREATE TABLE IF NOT EXISTS radgroupreply (
   id int(11) unsigned NOT NULL auto_increment,
   groupname varchar(64) NOT NULL default '',
   attribute varchar(64)  NOT NULL default '',
@@ -97,7 +105,7 @@ CREATE TABLE radgroupreply (
 # Table structure for table 'radreply'
 #
 
-CREATE TABLE radreply (
+CREATE TABLE IF NOT EXISTS radreply (
   id int(11) unsigned NOT NULL auto_increment,
   username varchar(64) NOT NULL default '',
   attribute varchar(64) NOT NULL default '',
@@ -112,29 +120,32 @@ CREATE TABLE radreply (
 # Table structure for table 'radusergroup'
 #
 
-CREATE TABLE radusergroup (
+CREATE TABLE IF NOT EXISTS radusergroup (
+  id int(11) unsigned NOT NULL auto_increment,
   username varchar(64) NOT NULL default '',
   groupname varchar(64) NOT NULL default '',
   priority int(11) NOT NULL default '1',
+  PRIMARY KEY  (id),
   KEY username (username(32))
 );
 
 #
 # Table structure for table 'radpostauth'
 #
-CREATE TABLE radpostauth (
+CREATE TABLE IF NOT EXISTS radpostauth (
   id int(11) NOT NULL auto_increment,
   username varchar(64) NOT NULL default '',
   pass varchar(64) NOT NULL default '',
   reply varchar(32) NOT NULL default '',
   authdate timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY  (id)
+  PRIMARY KEY  (id),
+  KEY username (username(32))
 ) ENGINE = INNODB;
 
 #
 # Table structure for table 'nas'
 #
-CREATE TABLE nas (
+CREATE TABLE IF NOT EXISTS nas (
   id int(10) NOT NULL auto_increment,
   nasname varchar(128) NOT NULL,
   shortname varchar(32),

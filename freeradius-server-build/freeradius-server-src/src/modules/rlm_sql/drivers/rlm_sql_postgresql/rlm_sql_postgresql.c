@@ -69,7 +69,7 @@ typedef struct rlm_sql_postgres_conn {
 	char		**row;
 } rlm_sql_postgres_conn_t;
 
-static CONF_PARSER driver_config[] = {
+static const CONF_PARSER driver_config[] = {
 	{ "send_application_name", FR_CONF_OFFSET(PW_TYPE_BOOLEAN, rlm_sql_postgres_config_t, send_application_name), "no" },
 	CONF_PARSER_TERMINATOR
 };
@@ -140,6 +140,10 @@ static int mod_instantiate(CONF_SECTION *conf, rlm_sql_config_t *config)
 			db_string = talloc_asprintf_append(db_string, " password='%s'", config->sql_password);
 		}
 
+		if (config->query_timeout) {
+			db_string = talloc_asprintf_append(db_string, " connect_timeout=%d", config->query_timeout);
+		}
+
 		if (driver->send_application_name) {
 			db_string = talloc_asprintf_append(db_string, " application_name='%s'", application_name);
 		}
@@ -166,6 +170,10 @@ static int mod_instantiate(CONF_SECTION *conf, rlm_sql_config_t *config)
 
 		if ((config->sql_password[0] != '\0') && !strstr(db_string, "password=")) {
 			db_string = talloc_asprintf_append(db_string, " password='%s'", config->sql_password);
+		}
+
+		if ((config->query_timeout) && !strstr(db_string, "connect_timeout=")) {
+			db_string = talloc_asprintf_append(db_string, " connect_timeout=%d", config->query_timeout);
 		}
 
 		if (driver->send_application_name && !strstr(db_string, "application_name=")) {
@@ -296,12 +304,50 @@ static CC_HINT(nonnull) sql_rcode_t sql_query(rlm_sql_handle_t *handle, UNUSED r
 					      char const *query)
 {
 	rlm_sql_postgres_conn_t *conn = handle->conn;
+	struct timeval timeout = {config->query_timeout, 0};
+	int sockfd, r;
+	fd_set read_fd;
 	ExecStatusType status;
 	int numfields = 0;
+	PGresult *tmp_result;
 
 	if (!conn->db) {
 		ERROR("rlm_sql_postgresql: Socket not connected");
 		return RLM_SQL_RECONNECT;
+	}
+
+	sockfd = PQsocket(conn->db);
+	if (sockfd < 0) {
+		ERROR("rlm_sql_postgresql: Unable to obtain socket: %s", PQerrorMessage(conn->db));
+		return RLM_SQL_RECONNECT;
+	}
+
+	if (!PQsendQuery(conn->db, query)) {
+		ERROR("rlm_sql_postgresql: Failed to send query: %s", PQerrorMessage(conn->db));
+		return RLM_SQL_RECONNECT;
+	}
+
+	/*
+	 * We try to avoid blocking by waiting until the driver indicates that
+         * the result is ready or our timeout expires
+	 */
+	while (PQisBusy(conn->db)) {
+		FD_ZERO(&read_fd);
+		FD_SET(sockfd, &read_fd);
+		r = select(sockfd + 1, &read_fd, NULL, NULL, config->query_timeout ? &timeout : NULL);
+		if (r == 0) {
+			ERROR("rlm_sql_postgresql: Socket read timeout after %d seconds", config->query_timeout);
+			return RLM_SQL_RECONNECT;
+		}
+		if (r < 0) {
+			if (errno == EINTR) continue;
+			ERROR("rlm_sql_postgresql: Failed in select: %s", fr_syserror(errno));
+			return RLM_SQL_RECONNECT;
+		}
+		if (!PQconsumeInput(conn->db)) {
+			ERROR("rlm_sql_postgresql: Failed reading input: %s", PQerrorMessage(conn->db));
+			return RLM_SQL_RECONNECT;
+		}
 	}
 
 	/*
@@ -312,7 +358,11 @@ static CC_HINT(nonnull) sql_rcode_t sql_query(rlm_sql_handle_t *handle, UNUSED r
 	 *  returned, it should be treated like a PGRES_FATAL_ERROR
 	 *  result.
 	 */
-	conn->result = PQexec(conn->db, query);
+	conn->result = PQgetResult(conn->db);
+
+	/* Discard results for appended queries */
+	while ((tmp_result = PQgetResult(conn->db)) != NULL)
+		PQclear(tmp_result);
 
 	/*
 	 *  As this error COULD be a connection error OR an out-of-memory
@@ -386,24 +436,6 @@ static CC_HINT(nonnull) sql_rcode_t sql_query(rlm_sql_handle_t *handle, UNUSED r
 static sql_rcode_t sql_select_query(rlm_sql_handle_t * handle, rlm_sql_config_t *config, char const *query)
 {
 	return sql_query(handle, config, query);
-}
-
-static sql_rcode_t sql_fields(char const **out[], rlm_sql_handle_t *handle, UNUSED rlm_sql_config_t *config)
-{
-	rlm_sql_postgres_conn_t *conn = handle->conn;
-
-	int		fields, i;
-	char const	**names;
-
-	fields = PQnfields(conn->result);
-	if (fields <= 0) return RLM_SQL_ERROR;
-
-	MEM(names = talloc_zero_array(handle, char const *, fields + 1));
-
-	for (i = 0; i < fields; i++) names[i] = PQfname(conn->result, i);
-	*out = names;
-
-	return RLM_SQL_OK;
 }
 
 static sql_rcode_t sql_fetch_row(rlm_sql_handle_t *handle, UNUSED rlm_sql_config_t *config)
@@ -505,6 +537,28 @@ static int sql_affected_rows(rlm_sql_handle_t * handle, UNUSED rlm_sql_config_t 
 	return conn->affected_rows;
 }
 
+static size_t sql_escape_func(UNUSED REQUEST *request, char *out, size_t outlen, char const *in, void *arg)
+{
+	size_t			inlen, ret;
+	rlm_sql_handle_t	*handle = talloc_get_type_abort(arg, rlm_sql_handle_t);
+	rlm_sql_postgres_conn_t	*conn = handle->conn;
+	int			err;
+
+	/* Check for potential buffer overflow */
+	inlen = strlen(in);
+	if ((inlen * 2 + 1) > outlen) return 0;
+	/* Prevent integer overflow */
+	if ((inlen * 2 + 1) <= inlen) return 0;
+
+	ret = PQescapeStringConn(conn->db, out, in, inlen, &err);
+	if (err) {
+		REDEBUG("Error escaping string \"%s\": %s", in, PQerrorMessage(conn->db));
+		return 0;
+	}
+
+	return ret;
+}
+
 /* Exported to rlm_sql */
 extern rlm_sql_module_t rlm_sql_postgresql;
 rlm_sql_module_t rlm_sql_postgresql = {
@@ -515,10 +569,10 @@ rlm_sql_module_t rlm_sql_postgresql = {
 	.sql_query			= sql_query,
 	.sql_select_query		= sql_select_query,
 	.sql_num_fields			= sql_num_fields,
-	.sql_fields			= sql_fields,
 	.sql_fetch_row			= sql_fetch_row,
 	.sql_error			= sql_error,
 	.sql_finish_query		= sql_free_result,
 	.sql_finish_select_query	= sql_free_result,
-	.sql_affected_rows		= sql_affected_rows
+	.sql_affected_rows		= sql_affected_rows,
+	.sql_escape_func		= sql_escape_func
 };
