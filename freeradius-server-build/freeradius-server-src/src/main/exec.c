@@ -605,9 +605,13 @@ int radius_exec_program(TALLOC_CTX *ctx, char *out, size_t outlen, VALUE_PAIR **
 
 		if (fr_pair_list_afrom_str(ctx, answer, output_pairs) == T_INVALID) {
 			RERROR("Failed parsing output from: %s: %s", cmd, fr_strerror());
-			strlcpy(out, answer, len);
+			if (out) strlcpy(out, answer, len);
 			ret = -1;
 		}
+
+		VERIFY_REQUEST(request);
+
+
 	/*
 	 *	We've not been told to extract output pairs,
 	 *	just copy the programs output to the out

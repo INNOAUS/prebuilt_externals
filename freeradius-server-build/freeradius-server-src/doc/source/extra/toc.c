@@ -25,26 +25,16 @@ of modules in each stage.
 
 @section main_branches GIT Branch
 
-@subsection branch_master Experimental Branch
+@subsection branch_master Master (v4) feature branch
 
 @code
 git clone git@github.com:FreeRADIUS/freeradius-server.git
 @endcode
 - Web: http://github.com/FreeRADIUS/freeradius-server/tree/master
 
-@subsection branch_31x 3.1.x feature branch
-
-@note Submit pull requests for new features or modules against this branch.
-
-@code
-git clone git@github.com:FreeRADIUS/freeradius-server.git
-cd freeradius-server
-git fetch origin v3.1.x:v3.1.x
-git checkout v3.1.x
-@endcode
-- Web: http://github.com/FreeRADIUS/freeradius-server/tree/v3.1.x
-
 @subsection branch_30x 3.0.x stable branch
+
+Minor bug fixes, documentation updatews, etc. go into this branch.
 
 @code
 git clone git@github.com:FreeRADIUS/freeradius-server.git
@@ -57,7 +47,7 @@ git checkout v3.0.x
 @subsection branch_2xx 2.x.x EOL branch
 
 @note This branch is now permanently feature frozen. New features or modules
-      should be submitted against the v3.1.x branch.
+      should be submitted against the master branch.
 
 @code
 git clone git@github.com:FreeRADIUS/freeradius-server.git
@@ -70,7 +60,7 @@ git checkout v2.x.x
 @subsection branch_1xx 1.1.x EOL branch
 
 @note This branch is now permanently feature frozen. New features or modules
-      should be submitted against the v3.1.x branch.
+      should be submitted against the master branch.
 
 @code
 git clone git@github.com:FreeRADIUS/freeradius-server.git

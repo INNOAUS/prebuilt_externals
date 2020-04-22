@@ -27,7 +27,7 @@ WORKDIR freeradius-server
 #
 # essential
 RUN apk add libc-dev talloc-dev
-RUN apk add libressl libressl-dev
+RUN apk add openssl openssl-dev
 RUN apk add linux-headers
 # general
 RUN apk add pcre-dev libidn-dev krb5-dev samba-dev curl-dev json-c-dev
@@ -69,7 +69,7 @@ RUN apk update \
     && apk add libcurl json-c libldap hiredis sqlite-dev \
 #RUN apk add libidn krb5
 #RUN apk add unbound-libs
-#RUN apk add ruby-libs perl python2
+#RUN apk add ruby-libs perl python2-dev
 #RUN apk add libmemcached gdbm libcouchbase
 #RUN apk add postgresql-dev mariadb-dev unixodbc-dev
     \

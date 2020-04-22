@@ -413,6 +413,12 @@ static int cache_verify(vp_map_t *map, void *ctx)
 				   fr_int2str(tmpl_names, map->rhs->type, "<INVALID>"));
 			return -1;
 		}
+		break;
+
+	case TMPL_TYPE_ATTR_UNDEFINED:
+		cf_log_err(map->ci, "Unknown attribute '%s'", map->rhs->name);
+		return -1;
+
 	default:
 		break;
 	}
@@ -477,7 +483,12 @@ static rlm_rcode_t CC_HINT(nonnull) mod_cache_it(void *instance, REQUEST *reques
 	 *	If there's no existing cache entry, go and create a new one.
 	 */
 	if (!c) {
-		if (ttl <= 0) ttl = inst->ttl;
+		if (ttl == 0) {
+			ttl = inst->ttl;
+
+		} else if (ttl < 0) {
+			ttl = -ttl;
+		}
 		goto insert;
 	}
 

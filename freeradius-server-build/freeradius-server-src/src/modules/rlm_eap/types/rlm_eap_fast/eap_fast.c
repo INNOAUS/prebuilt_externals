@@ -773,10 +773,21 @@ static rlm_rcode_t CC_HINT(nonnull) process_reply( eap_handler_t *eap_session,
 			/* FIXME must be a better way to capture/re-derive this later for ISK */
 			switch (vp->da->attr) {
 			case PW_MSCHAP_MPPE_SEND_KEY:
+				if (vp->vp_length != CHAP_VALUE_LENGTH) {
+				wrong_length:
+					REDEBUG("Found %s with incorrect length.  Expected %u, got %zu",
+						vp->da->name, 16, vp->vp_length);
+					rcode = RLM_MODULE_INVALID;
+					break;
+				}
+
+
 				memcpy(t->isk.mppe_send, vp->vp_octets, CHAP_VALUE_LENGTH);
 				break;
 
 			case PW_MSCHAP_MPPE_RECV_KEY:
+				if (vp->length != CHAP_VALUE_LENGTH) goto wrong_length;
+
 				memcpy(t->isk.mppe_recv, vp->vp_octets, CHAP_VALUE_LENGTH);
 				break;
 

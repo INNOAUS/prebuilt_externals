@@ -926,6 +926,56 @@ static void cprint_conf_parser(rad_listen_t *listener, int indent, CONF_SECTION 
 	cprintf(listener, "%.*s}\n", indent, tabs);
 }
 
+static void cprint_conf_section(rad_listen_t *listener, int indent, CONF_SECTION *cs)
+{
+	char const *name1 = cf_section_name1(cs);
+	char const *name2 = cf_section_name2(cs);
+	CONF_ITEM *ci;
+
+	if (name2) {
+		cprintf(listener, "%.*s%s %s {\n", indent, tabs, name1, name2);
+	} else {
+		cprintf(listener, "%.*s%s {\n", indent, tabs, name1);
+	}
+
+	indent++;
+
+
+	for (ci = cf_item_find_next(cs, NULL);
+	     ci != NULL;
+	     ci = cf_item_find_next(cs, ci)) {
+		CONF_PAIR const *cp;
+		char const *value;
+
+		if (cf_item_is_section(ci)) {
+			cprint_conf_section(listener, indent, cf_item_to_section(ci));
+			continue;
+		}
+
+		if (!cf_item_is_pair(ci)) continue;
+
+		cp = cf_item_to_pair(ci);
+		value = cf_pair_value(cp);
+
+		if (value) {
+			/*
+			 *	@todo - quote the value if necessary.
+			 */
+			cprintf(listener, "%.*s%s = %s\n",
+				indent, tabs,
+				cf_pair_attr(cp), value);
+		} else {
+			cprintf(listener, "%.*s%s\n",
+				indent, tabs,
+				cf_pair_attr(cp));
+		}
+	}
+
+	indent--;
+
+	cprintf(listener, "%.*s}\n", indent, tabs);
+}
+
 static int command_show_module_config(rad_listen_t *listener, int argc, char *argv[])
 {
 	CONF_SECTION *cs;
@@ -1171,6 +1221,24 @@ static int command_show_home_servers(rad_listen_t *listener, UNUSED int argc, UN
 	return CMD_OK;
 }
 #endif
+
+static RADCLIENT *get_client(rad_listen_t *listener, int argc, char *argv[]);
+
+static int command_show_client_config(rad_listen_t *listener, int argc, char *argv[])
+{
+	RADCLIENT *client;
+
+	client = get_client(listener, argc, argv);
+	if (!client) {
+		return 0;
+	}
+
+	if (!client->cs) return 1;
+
+	cprint_conf_section(listener, 0, client->cs);
+	return 1;
+}
+
 
 static int command_show_clients(rad_listen_t *listener, UNUSED int argc, UNUSED char *argv[])
 {
@@ -1971,6 +2039,13 @@ static fr_command_table_t command_table_show_module[] = {
 };
 
 static fr_command_table_t command_table_show_client[] = {
+	{ "config", FR_READ,
+	  "show client config <ipaddr> "
+#ifdef WITH_TCP
+	  "[udp|tcp] "
+#endif
+	  "- show configuration for given client",
+	  command_show_client_config, NULL },
 	{ "list", FR_READ,
 	  "show client list - shows list of global clients",
 	  command_show_clients, NULL },
@@ -2155,52 +2230,37 @@ static char const *elapsed_names[8] = {
 	"1us", "10us", "100us", "1ms", "10ms", "100ms", "1s", "10s"
 };
 
-#undef PU
-#ifdef WITH_STATS_64BIT
-#ifdef PRIu64
-#define PU "%" PRIu64
-#else
-#define PU "%lu"
-#endif
-#else
-#ifdef PRIu32
-#define PU "%" PRIu32
-#else
-#define PU "%u"
-#endif
-#endif
-
 static int command_print_stats(rad_listen_t *listener, fr_stats_t *stats,
 			       int auth, int server)
 {
 	int i;
 
-	cprintf(listener, "requests\t" PU "\n", stats->total_requests);
-	cprintf(listener, "responses\t" PU "\n", stats->total_responses);
+	cprintf(listener, "requests\t%" PRIu64 "\n", stats->total_requests);
+	cprintf(listener, "responses\t%" PRIu64 "\n", stats->total_responses);
 
 	if (auth) {
-		cprintf(listener, "accepts\t\t" PU "\n",
+		cprintf(listener, "accepts\t\t%" PRIu64 "\n",
 			stats->total_access_accepts);
-		cprintf(listener, "rejects\t\t" PU "\n",
+		cprintf(listener, "rejects\t\t%" PRIu64 "\n",
 			stats->total_access_rejects);
-		cprintf(listener, "challenges\t" PU "\n",
+		cprintf(listener, "challenges\t%" PRIu64 "\n",
 			stats->total_access_challenges);
 	}
 
-	cprintf(listener, "dup\t\t" PU "\n", stats->total_dup_requests);
-	cprintf(listener, "invalid\t\t" PU "\n", stats->total_invalid_requests);
-	cprintf(listener, "malformed\t" PU "\n", stats->total_malformed_requests);
-	cprintf(listener, "bad_authenticator\t" PU "\n", stats->total_bad_authenticators);
-	cprintf(listener, "dropped\t\t" PU "\n", stats->total_packets_dropped);
-	cprintf(listener, "unknown_types\t" PU "\n", stats->total_unknown_types);
+	cprintf(listener, "dup\t\t%" PRIu64 "\n", stats->total_dup_requests);
+	cprintf(listener, "invalid\t\t%" PRIu64 "\n", stats->total_invalid_requests);
+	cprintf(listener, "malformed\t%" PRIu64 "\n", stats->total_malformed_requests);
+	cprintf(listener, "bad_authenticator\t%" PRIu64 "\n", stats->total_bad_authenticators);
+	cprintf(listener, "dropped\t\t%" PRIu64 "\n", stats->total_packets_dropped);
+	cprintf(listener, "unknown_types\t%" PRIu64 "\n", stats->total_unknown_types);
 
 	if (server) {
-		cprintf(listener, "timeouts\t" PU "\n", stats->total_timeouts);
+		cprintf(listener, "timeouts\t%" PRIu64 "\n", stats->total_timeouts);
 	}
 
 	cprintf(listener, "last_packet\t%" PRId64 "\n", (int64_t) stats->last_packet);
 	for (i = 0; i < 8; i++) {
-		cprintf(listener, "elapsed.%s\t%u\n",
+		cprintf(listener, "elapsed.%s\t%" PRIu64 "\n",
 			elapsed_names[i], stats->elapsed[i]);
 	}
 
@@ -2215,14 +2275,14 @@ static int command_stats_queue(rad_listen_t *listener, UNUSED int argc, UNUSED c
 
 	thread_pool_queue_stats(array, pps);
 
-	cprintf(listener, "queue_len_internal\t" PU "\n", array[0]);
-	cprintf(listener, "queue_len_proxy\t\t" PU "\n", array[1]);
-	cprintf(listener, "queue_len_auth\t\t" PU "\n", array[2]);
-	cprintf(listener, "queue_len_acct\t\t" PU "\n", array[3]);
-	cprintf(listener, "queue_len_detail\t" PU "\n", array[4]);
+	cprintf(listener, "queue_len_internal\t%d\n", array[0]);
+	cprintf(listener, "queue_len_proxy\t\t%d\n", array[1]);
+	cprintf(listener, "queue_len_auth\t\t%d\n", array[2]);
+	cprintf(listener, "queue_len_acct\t\t%d\n", array[3]);
+	cprintf(listener, "queue_len_detail\t%d\n", array[4]);
 
-	cprintf(listener, "queue_pps_in\t\t" PU "\n", pps[0]);
-	cprintf(listener, "queue_pps_out\t\t" PU "\n", pps[1]);
+	cprintf(listener, "queue_pps_in\t\t%d\n", pps[0]);
+	cprintf(listener, "queue_pps_out\t\t%d\n", pps[1]);
 
 	return CMD_OK;
 }
